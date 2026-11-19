@@ -68,7 +68,7 @@ else:
 store=Store(DATA)
 if PUBLIC_DEMO and not store.cases() and not store.deleted_cases():
     demo_case=tsh_case().model_dump()
-    demo_case.update(title='Synthetic demonstration — editable session copy',scientific_reviewer='Demo Scientist',director='Demo Director')
+    demo_case.update(title='Synthetic demonstration — editable session copy',scientific_reviewer='Demo Scientist',director='Demo Director',instruments={},field_status={'kit_price':'Agents to research','sample_handling':'Agents to research','validation_conditions':'Agents to research'})
     demo_cid=store.save_case(demo_case)
     demo_engine=Engine(store)
     try:
