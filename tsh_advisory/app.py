@@ -67,6 +67,9 @@ if PUBLIC_DEMO:
 else:
     DATA=Path(os.getenv('BIO_ADVISORY_DATA',str(ROOT/'runs')))
 store=Store(DATA)
+def sandbox_widget_key(location,label):
+    return token+'_'+location+'_'+str(label) if PUBLIC_DEMO else None
+
 if PUBLIC_DEMO and not store.cases() and not store.deleted_cases():
     demo_case=tsh_case().model_dump()
     demo_case.update(title='Synthetic demonstration — editable session copy',scientific_reviewer='Demo Scientist',director='Demo Director',instruments={},field_status={'kit_price':'Agents to research','sample_handling':'Agents to research','validation_conditions':'Agents to research'})
@@ -84,44 +87,44 @@ def engine_action(fn):
     finally: engine.close()
 
 def nullable_number(label,value,min_value=0.0,step=1.0):
-    return st.number_input(label,min_value=min_value,value=float(value) if value is not None else None,step=step)
+    return st.number_input(label,min_value=min_value,value=float(value) if value is not None else None,step=step,key=sandbox_widget_key('line87',label))
 
 def intake_view(cid):
     saved=store.case(cid); original=Intake.model_validate(saved['data']); d=original.model_dump()
     st.subheader('Project intake')
     st.caption('Save an incomplete draft. Agents research missing evidence; reviewers resolve scientific decisions. Validation volume is calculated, not entered here.')
-    d['title']=st.text_input('Project title',d['title'])
+    d['title']=st.text_input('Project title',d['title'],key=sandbox_widget_key('line93','Project title'))
     a,b=st.columns(2)
     with a:
-        d['analyte']=st.text_input('Analyte',d['analyte'])
-        d['species']=st.text_input('Species',d['species'])
-        d['matrix']=st.text_input('Matrix',d['matrix'])
+        d['analyte']=st.text_input('Analyte',d['analyte'],key=sandbox_widget_key('line96','Analyte'))
+        d['species']=st.text_input('Species',d['species'],key=sandbox_widget_key('line97','Species'))
+        d['matrix']=st.text_input('Matrix',d['matrix'],key=sandbox_widget_key('line98','Matrix'))
     with b:
         uses=['Detect treatment-related changes versus controls','Preclinical safety assessment','Pharmacodynamic response','Dose-response assessment','Exploratory biomarker assessment','Disease progression monitoring','Method development and validation planning']
         uses=list(dict.fromkeys(uses+([d['intended_use']] if d['intended_use'] else [])))
-        d['intended_use']=st.selectbox('Intended use',uses,index=uses.index(d['intended_use']) if d['intended_use'] in uses else 0)
-        d['deadline']=st.text_input('Target date',d['deadline'])
-        d['regulatory_use']=st.selectbox('Regulatory reliance',['Reviewer decision required','Internal preclinical decision','Human-drug development regulatory support','Veterinary use requires separate applicability review'],index=['Reviewer decision required','Internal preclinical decision','Human-drug development regulatory support','Veterinary use requires separate applicability review'].index(d['regulatory_use']))
+        d['intended_use']=st.selectbox('Intended use',uses,index=uses.index(d['intended_use']) if d['intended_use'] in uses else 0,key=sandbox_widget_key('line102','Intended use'))
+        d['deadline']=st.text_input('Target date',d['deadline'],key=sandbox_widget_key('line103','Target date'))
+        d['regulatory_use']=st.selectbox('Regulatory reliance',['Reviewer decision required','Internal preclinical decision','Human-drug development regulatory support','Veterinary use requires separate applicability review'],index=['Reviewer decision required','Internal preclinical decision','Human-drug development regulatory support','Veterinary use requires separate applicability review'].index(d['regulatory_use']),key=sandbox_widget_key('line104','Regulatory reliance'))
     with st.expander('Instruments and configurations',expanded=True):
         families=list(dict.fromkeys(['SpectraMax','Bio-Plex','MSD']+list(d['instruments'])))
-        chosen=st.multiselect('Available instrument platforms (select all that apply)',families,default=[k for k,v in d['instruments'].items() if v],accept_new_options=True)
-        d['instruments']={family:st.text_input(f'{family} exact model (required)',d['instruments'].get(family,'')) for family in chosen}
+        chosen=st.multiselect('Available instrument platforms (select all that apply)',families,default=[k for k,v in d['instruments'].items() if v],accept_new_options=True,key=sandbox_widget_key('line107','Available instrument platforms (select all that apply)'))
+        d['instruments']={family:st.text_input(f'{family} exact model (required)',d['instruments'].get(family,''),key=sandbox_widget_key('line108',f'{family} exact model (required)')) for family in chosen}
         st.caption('Listed platforms/models are your available instruments. Agents list the kit manual/vendor requirements separately; the scientist confirms suitability at approval. Automatic name/model matching does not block approval.')
         if any(not model.strip() for model in d['instruments'].values()):st.warning('Enter an exact model for each selected platform before starting a new run. Drafts can still be saved.')
     with st.expander('Study sample availability',expanded=True):
         a,b,c=st.columns(3)
         with a:
             d['available_ul']=nullable_number('Available study volume (µL)',d['available_ul'],min_value=.01)
-            d['volume_basis']=st.text_input('Allocation basis',d['volume_basis'].replace('animal','lot'))
+            d['volume_basis']=st.text_input('Allocation basis',d['volume_basis'].replace('animal','lot'),key=sandbox_widget_key('line115','Allocation basis'))
         with b:
-            d['initial_wells']=st.number_input('Initial wells per sample',min_value=1,value=d['initial_wells'])
-            d['complete_repeats']=st.number_input('Complete repeats to reserve',min_value=0,max_value=3,value=d['complete_repeats'])
+            d['initial_wells']=st.number_input('Initial wells per sample',min_value=1,value=d['initial_wells'],key=sandbox_widget_key('line117','Initial wells per sample'))
+            d['complete_repeats']=st.number_input('Complete repeats to reserve',min_value=0,max_value=3,value=d['complete_repeats'],key=sandbox_widget_key('line118','Complete repeats to reserve'))
         with c:
             v=nullable_number('Study sample count (optional)',d['study_count'],min_value=1.0)
             d['study_count']=int(v) if v is not None else None
         st.caption('Available volume must cover initial wells, the repeat reserve and handling losses. This value is specific to this intake.')
     with st.expander('Validation design requirements',expanded=True):
-        d['lot_count']=st.number_input('Distinct pooled lots',min_value=1,max_value=20,value=d['lot_count'])
+        d['lot_count']=st.number_input('Distinct pooled lots',min_value=1,max_value=20,value=d['lot_count'],key=sandbox_widget_key('line124','Distinct pooled lots'))
         st.markdown('#### Plate control layouts')
         for title,fields in [
             ('Precision and Accuracy plates',[('pa_blank_wells','Blank wells'),('pa_standard_levels','Standard levels'),('pa_standard_replicates','Wells per standard level'),('qc_levels','QC levels'),('qc_wells_per_level','Wells per QC level')]),
@@ -134,27 +137,27 @@ def intake_view(cid):
         d['assay_control_wells_per_run']=d['nonpa_blank_wells']+d['nonpa_standard_levels']*d['nonpa_standard_replicates']+d['nonpa_qc_levels']*d['nonpa_qc_replicates']
         st.write(f"P/A control wells per plate: {pa_total}. Non-P/A control wells per plate: {d['assay_control_wells_per_run']}.")
         st.caption('Non-P/A starting values preserve the previous 24-well allowance; edit the component counts to match the selected kit.')
-        d['preparation_leeway_ul']=st.number_input('Extra prepared volume per dilution/condition (µL)',min_value=10,max_value=20,value=d['preparation_leeway_ul'])
-        d['include_tqc_eqc']=st.checkbox('Include optional tQC/EQC (same design as Day 0)',value=d['include_tqc_eqc'])
+        d['preparation_leeway_ul']=st.number_input('Extra prepared volume per dilution/condition (µL)',min_value=10,max_value=20,value=d['preparation_leeway_ul'],key=sandbox_widget_key('line137','Extra prepared volume per dilution/condition (µL)'))
+        d['include_tqc_eqc']=st.checkbox('Include optional tQC/EQC (same design as Day 0)',value=d['include_tqc_eqc'],key=sandbox_widget_key('line138','Include optional tQC/EQC (same design as Day 0)'))
         st.info(f'Precision and Accuracy: {d["precision_accuracy_plates"]} initial plates, {pa_total} control wells per plate. Each P/A plate hosts at most one additional parameter. Each parameter has its own repeat plate allocation. Long-term assessments remain separate.')
         for key,label in [('day0_wells_per_lot','Day 0 wells per lot'),('stability_wells_per_lot','Stability wells per lot per condition'),('parallel_wells_per_dilution','Parallelism wells per lot per dilution'),('freeze_wells_per_endpoint','Freeze–thaw wells per lot per endpoint')]:
-            d[key]=st.number_input(label,min_value=1,value=d[key])
+            d[key]=st.number_input(label,min_value=1,value=d[key],key=sandbox_widget_key('line141',label))
         st.markdown('#### Short-term stability')
         options=['4 °C · 4 hours','4 °C · 24 hours','Room temperature · 4 hours','Room temperature · 24 hours','Room temperature · 48 hours','4 °C · 48 hours']
         options=list(dict.fromkeys(options+d['short_term_conditions']))
-        d['short_term_conditions']=st.multiselect('Short-term stability conditions (select all that apply)',options,default=d['short_term_conditions'],accept_new_options=True)
+        d['short_term_conditions']=st.multiselect('Short-term stability conditions (select all that apply)',options,default=d['short_term_conditions'],accept_new_options=True,key=sandbox_widget_key('line145','Short-term stability conditions (select all that apply)'))
         st.caption('Choose multiple conditions using the dropdown checkmarks, or type a custom temperature and duration. Each selection is a separate assessment condition.')
         st.markdown('#### Long-term stability')
-        d['long_term_assessments']=st.number_input('Number of long-term stability assessments',min_value=0,max_value=100,value=d['long_term_assessments'])
+        d['long_term_assessments']=st.number_input('Number of long-term stability assessments',min_value=0,max_value=100,value=d['long_term_assessments'],key=sandbox_widget_key('line148','Number of long-term stability assessments'))
         d['long_term_material_type']='lots'
         storage=['−80 °C','−20 °C','2–8 °C','Room temperature']
-        d['long_term_storage_conditions']=st.multiselect('Long-term storage conditions (select all that apply)',list(dict.fromkeys(storage+d.get('long_term_storage_conditions',[]))),default=d.get('long_term_storage_conditions',[]),accept_new_options=True)
+        d['long_term_storage_conditions']=st.multiselect('Long-term storage conditions (select all that apply)',list(dict.fromkeys(storage+d.get('long_term_storage_conditions',[]))),default=d.get('long_term_storage_conditions',[]),accept_new_options=True,key=sandbox_widget_key('line151','Long-term storage conditions (select all that apply)'))
         st.caption('Each assessment at EACH selected storage condition: 3 lots × 3 wells = 9 initial wells plus one complete repeat. Three assessments at two temperatures means six separate assessments. Set assessments to 0 to omit.')
         st.markdown('#### Freeze–thaw')
-        d['freeze_thaw_cycles']=st.number_input('Number of freeze–thaw cycles to test',min_value=3,max_value=20,value=d['freeze_thaw_cycles'])
+        d['freeze_thaw_cycles']=st.number_input('Number of freeze–thaw cycles to test',min_value=3,max_value=20,value=d['freeze_thaw_cycles'],key=sandbox_widget_key('line154','Number of freeze–thaw cycles to test'))
         st.caption('Each cycle endpoint is tested using separate aliquots. All endpoints are assayed after planned cycling is complete.')
         st.markdown('#### Parallelism dilution series')
-        d['parallel_dilution_count']=st.number_input('Number of parallelism dilutions',min_value=1,max_value=20,value=d['parallel_dilution_count'])
+        d['parallel_dilution_count']=st.number_input('Number of parallelism dilutions',min_value=1,max_value=20,value=d['parallel_dilution_count'],key=sandbox_widget_key('line157','Number of parallelism dilutions'))
         st.caption('Set starting dilution and serial factor in Agent workspace → Volumes after selecting a kit.')
         st.markdown('#### Additional validation parameters (optional)')
         st.caption('Add a row for each extra parameter. Separate conditions with semicolons. Each condition uses the specified wells per lot and the configured complete repeat. Check separate plates when conditions must be assayed separately; scientist confirms timing compatibility. Volumes use the lowest parallelism dilution and the same preparation/handling allowances.')
@@ -168,19 +171,19 @@ def intake_view(cid):
         st.caption('New runs use the corrected planning engine; existing saved revisions remain unchanged.')
         st.info('Agents use these design settings to calculate validation volume per parameter and material unit. Validation material volume is not an intake field.')
     with st.expander('People and costing'):
-        d['scientific_reviewer']=st.text_input('Scientific reviewer and business cost approver',d['scientific_reviewer'])
-        d['director']=st.text_input('Separate manager or director',d['director'])
-        d['labor_rate']=st.number_input('Labor rate (USD/hour)',min_value=.01,value=float(d['labor_rate']))
+        d['scientific_reviewer']=st.text_input('Scientific reviewer and business cost approver',d['scientific_reviewer'],key=sandbox_widget_key('line171','Scientific reviewer and business cost approver'))
+        d['director']=st.text_input('Separate manager or director',d['director'],key=sandbox_widget_key('line172','Separate manager or director'))
+        d['labor_rate']=st.number_input('Labor rate (USD/hour)',min_value=.01,value=float(d['labor_rate']),key=sandbox_widget_key('line173','Labor rate (USD/hour)'))
         d['budget_ceiling']=nullable_number('Optional project budget ceiling (USD)',d['budget_ceiling'],min_value=.01)
-        d['budget_basis']=st.selectbox('Ceiling basis',['internal_cost','client_price'],index=['internal_cost','client_price'].index(d['budget_basis']))
+        d['budget_basis']=st.selectbox('Ceiling basis',['internal_cost','client_price'],index=['internal_cost','client_price'].index(d['budget_basis']),key=sandbox_widget_key('line175','Ceiling basis'))
         st.caption('Shipping, instrument rates, overhead, contingency and pooled material pricing are researched/proposed for approval. Blank ceiling means no project ceiling.')
     with st.expander('Unresolved fields and comments'):
         st.caption('Expected study concentrations may remain unknown and do not block planning approval. The kit’s documented curve range is still shown in comparison and reports.')
         for field in ['sample_handling','kit_price','validation_conditions']:
             statuses=['Agents to research','Reviewer decision required','Supplied','Confirmed','Not applicable']
             old=d['field_status'].get(field,statuses[0])
-            d['field_status'][field]=st.selectbox(field.replace('_',' ').title(),statuses,index=statuses.index(old))
-        d['notes']=st.text_area('Additional context',d['notes'])
+            d['field_status'][field]=st.selectbox(field.replace('_',' ').title(),statuses,index=statuses.index(old),key=sandbox_widget_key('line182',field.replace('_', ' ').title()))
+        d['notes']=st.text_area('Additional context',d['notes'],key=sandbox_widget_key('line183','Additional context'))
     try:
         clean=Intake.model_validate(d).model_dump()
         changed=digest(clean)!=digest(original.model_dump())
@@ -201,8 +204,8 @@ def settings_view():
     path=DATA/'settings.json'
     if path.exists(): saved=json.loads(path.read_text())
     with st.form('settings'):
-        model=st.text_input('Accessible OpenAI model ID',saved.get('model',os.getenv('OPENAI_MODEL','')))
-        rate_date=st.text_input('Rate card date and source URL',saved.get('rate_date',''))
+        model=st.text_input('Accessible OpenAI model ID',saved.get('model',os.getenv('OPENAI_MODEL','')),key=sandbox_widget_key('line204','Accessible OpenAI model ID'))
+        rate_date=st.text_input('Rate card date and source URL',saved.get('rate_date',''),key=sandbox_widget_key('line205','Rate card date and source URL'))
         a,b,c=st.columns(3)
         rates=saved.get('rates',{})
         with a: inp=nullable_number('Input USD per million tokens',rates.get('input'),step=.1)
@@ -237,15 +240,15 @@ def volume_charts(p,rid):
     with st.form('volume_settings_'+rid):
         st.write('Number of dilutions: '+str(case.get('parallel_dilution_count','Not set'))+' (configured in intake)')
         a,b=st.columns(2)
-        with a:start=st.number_input('Starting dilution denominator (1:x)',min_value=1.0,max_value=1000000.0,value=float(minimum if follow_minimum else case.get('parallel_start_dilution',1)),disabled=follow_minimum)
-        with b:factor=st.number_input('Serial dilution factor',min_value=1.01,max_value=100.0,value=float(case.get('parallel_serial_factor',2)),step=.5)
-        follow=st.checkbox('Study analysis uses lowest tested parallelism dilution',value=case.get('study_dilution') is None)
+        with a:start=st.number_input('Starting dilution denominator (1:x)',min_value=1.0,max_value=1000000.0,value=float(minimum if follow_minimum else case.get('parallel_start_dilution',1)),disabled=follow_minimum,key=sandbox_widget_key('line240','Starting dilution denominator (1:x)'))
+        with b:factor=st.number_input('Serial dilution factor',min_value=1.01,max_value=100.0,value=float(case.get('parallel_serial_factor',2)),step=.5,key=sandbox_widget_key('line241','Serial dilution factor'))
+        follow=st.checkbox('Study analysis uses lowest tested parallelism dilution',value=case.get('study_dilution') is None,key=sandbox_widget_key('line242','Study analysis uses lowest tested parallelism dilution'))
         study_dilution=None
         study_reason=''
         if not follow:
-            study_dilution=st.number_input('Study analysis dilution denominator (1:x)',min_value=1.0,value=float(case.get('study_dilution') or case.get('parallel_start_dilution',1)))
-            study_reason=st.text_input('Reason for separate study dilution',case.get('study_dilution_override_reason',''))
-        actor=st.text_input('Scientific reviewer name',case.get('scientific_reviewer',''))
+            study_dilution=st.number_input('Study analysis dilution denominator (1:x)',min_value=1.0,value=float(case.get('study_dilution') or case.get('parallel_start_dilution',1)),key=sandbox_widget_key('line246','Study analysis dilution denominator (1:x)'))
+            study_reason=st.text_input('Reason for separate study dilution',case.get('study_dilution_override_reason',''),key=sandbox_widget_key('line247','Reason for separate study dilution'))
+        actor=st.text_input('Scientific reviewer name',case.get('scientific_reviewer',''),key=sandbox_widget_key('line248','Scientific reviewer name'))
         if st.form_submit_button('Apply dilution settings'):
             try:
                 engine_action(lambda e:e.configure_review(rid,actor,start=start,factor=factor,use_kit_minimum=follow_minimum,study_settings={'dilution':study_dilution,'reason':study_reason}))
@@ -399,14 +402,14 @@ def candidate_view(p,rid):
         if detail['quote']:st.text(detail['quote'])
         st.caption('Reviewer: '+(detail['reviewer'] or 'Not recorded')+' · Last changed/reviewed: '+(detail['reviewed_at'] or 'Not recorded'))
         with st.form('cell_evidence_'+rid+'_'+detail_kit['id']+'_'+field):
-            evidence_actor=st.text_input('Reviewer linking evidence',p['case']['scientific_reviewer'])
-            source_id=st.selectbox('Retained source (blank = reviewer assertion)',[None]+list(p.get('sources',{})),index=([None]+list(p.get('sources',{}))).index(detail['source_id']) if detail['source_id'] in p.get('sources',{}) else 0,format_func=lambda sid:'Reviewer assertion / estimate' if sid is None else sid+' · '+p['sources'][sid]['url'])
-            source_url=st.text_input('New public source URL (optional; retrieves and retains document without a model call)',value='')
-            locator=st.text_input('Page / section',detail['locator'])
-            quote=st.text_area('Exact supporting passage (maximum 400 characters)',detail['quote'],max_chars=400)
-            notes=st.text_area('Assertion basis / review notes',detail['notes'])
-            verified=st.checkbox('I verified that the passage or assertion supports this displayed value.')
-            identity=st.checkbox('For species/analyte: this passage also identifies kit catalog, target and supported species.') if field in ('species','analyte') else False
+            evidence_actor=st.text_input('Reviewer linking evidence',p['case']['scientific_reviewer'],key=sandbox_widget_key('line402','Reviewer linking evidence'))
+            source_id=st.selectbox('Retained source (blank = reviewer assertion)',[None]+list(p.get('sources',{})),index=([None]+list(p.get('sources',{}))).index(detail['source_id']) if detail['source_id'] in p.get('sources',{}) else 0,format_func=lambda sid:'Reviewer assertion / estimate' if sid is None else sid+' · '+p['sources'][sid]['url'],key=sandbox_widget_key('line403','Retained source (blank = reviewer assertion)'))
+            source_url=st.text_input('New public source URL (optional; retrieves and retains document without a model call)',value='',key=sandbox_widget_key('line404','New public source URL (optional; retrieves and retains document without a model call)'))
+            locator=st.text_input('Page / section',detail['locator'],key=sandbox_widget_key('line405','Page / section'))
+            quote=st.text_area('Exact supporting passage (maximum 400 characters)',detail['quote'],max_chars=400,key=sandbox_widget_key('line406','Exact supporting passage (maximum 400 characters)'))
+            notes=st.text_area('Assertion basis / review notes',detail['notes'],key=sandbox_widget_key('line407','Assertion basis / review notes'))
+            verified=st.checkbox('I verified that the passage or assertion supports this displayed value.',key=sandbox_widget_key('line408','I verified that the passage or assertion supports this displayed value.'))
+            identity=st.checkbox('For species/analyte: this passage also identifies kit catalog, target and supported species.',key=sandbox_widget_key('line409','For species/analyte: this passage also identifies kit catalog, target and supported species.')) if field in ('species','analyte') else False
             if st.form_submit_button('Save cell evidence'):
                 try:
                     if not verified:raise ValueError('Confirm your review of this cell value.')
@@ -418,7 +421,7 @@ def candidate_view(p,rid):
         st.markdown('**Decision rubric (no numerical score)**')
         for label,importance,basis in analysis['rubric']:st.write(label+' — '+importance+': '+basis)
     with st.form('candidate_grid_'+rid):
-        actor=st.text_input('Scientific reviewer name',p.get('case',{}).get('scientific_reviewer',''))
+        actor=st.text_input('Scientific reviewer name',p.get('case',{}).get('scientific_reviewer',''),key=sandbox_widget_key('line421','Scientific reviewer name'))
         current=p.get('selected_kit');index=next((i for i,k in enumerate(candidates) if k['id']==current),None)
         selected=st.selectbox('Select kit for volume calculations',candidates,index=index,format_func=lambda k:k['name']+' / '+k['catalog'],key='kit_choice_'+rid)
         save=st.form_submit_button('Save comparison changes')
@@ -502,15 +505,15 @@ def science_review(rid,p,state):
     elif blocking_findings(p):
         st.info('Findings are advisory and do not block approval. Review them and document your decision.')
     with right.form('science-decision-'+rid+'-'+str(p.get('planning_revision',1))+'-'+section):
-        actor=st.text_input('Named scientific/cost reviewer',state['case']['scientific_reviewer'],disabled=True)
+        actor=st.text_input('Named scientific/cost reviewer',state['case']['scientific_reviewer'],disabled=True,key=sandbox_widget_key('line505','Named scientific/cost reviewer'))
         st.markdown('**'+SECTION_LABELS[section]+' decision**')
-        action=st.selectbox('Decision',['approve','return','reject'],index=None)
-        reason=st.selectbox('Reason',POSITIVE['scientific']+NEGATIVE,index=None)
+        action=st.selectbox('Decision',['approve','return','reject'],index=None,key=sandbox_widget_key('line507','Decision'))
+        reason=st.selectbox('Reason',POSITIVE['scientific']+NEGATIVE,index=None,key=sandbox_widget_key('line508','Reason'))
         candidates=p.get('candidates',[])
-        kit=st.selectbox('Approved kit (explicit choice required for recommendation)',candidates,index=None,format_func=lambda k:k['manufacturer']+' / '+k['name']+' / '+k['catalog']) if section=='recommendation' else None
-        comments=st.text_area('Selection rationale, limitations or revision instructions')
-        attest=st.checkbox('I am the named reviewer and accept responsibility for this decision.')
-        instrument_confirmed=st.checkbox('For recommendation approval: I confirm the available instruments and equipment are suitable for the selected kit.') if section=='recommendation' else False
+        kit=st.selectbox('Approved kit (explicit choice required for recommendation)',candidates,index=None,format_func=lambda k:k['manufacturer']+' / '+k['name']+' / '+k['catalog'],key=sandbox_widget_key('line510','Approved kit (explicit choice required for recommendation)')) if section=='recommendation' else None
+        comments=st.text_area('Selection rationale, limitations or revision instructions',key=sandbox_widget_key('line511','Selection rationale, limitations or revision instructions'))
+        attest=st.checkbox('I am the named reviewer and accept responsibility for this decision.',key=sandbox_widget_key('line512','I am the named reviewer and accept responsibility for this decision.'))
+        instrument_confirmed=st.checkbox('For recommendation approval: I confirm the available instruments and equipment are suitable for the selected kit.',key=sandbox_widget_key('line513','For recommendation approval: I confirm the available instruments and equipment are suitable for the selected kit.')) if section=='recommendation' else False
         simulation=st.checkbox('Record a simulated approval for TEST DATA only',key='science_simulation_'+rid) if test_run else False
         submit=st.form_submit_button('Record section decision')
     if submit:
@@ -551,7 +554,7 @@ def cost_view(rid,p,state):
         st.caption('Double-click an estimate to edit, then press Tab. Only changed values are marked blue and bold. Kit timing, intake labor rate and automatic overhead are read-only.')
         st.caption('Calculations and totals reflect saved estimates. Save changes to recalculate; timing/reference rows are not additional costs.')
         edited=render_cost_grid(baseline,'cost_estimates_'+rid+'_'+str(p.get('planning_revision',1)))
-        cost_actor=st.text_input('Reviewer recording estimates',state['case']['scientific_reviewer'])
+        cost_actor=st.text_input('Reviewer recording estimates',state['case']['scientific_reviewer'],key=sandbox_widget_key('line554','Reviewer recording estimates'))
         if st.button('Save estimate assumptions'):
             try:
                 updates=cost_changes(edited,baseline)
@@ -578,11 +581,11 @@ def director_view(rid,p,state):
     st.caption('Review project estimates in the Cost estimates tab before recording this decision.')
     if state.get('status')!='awaiting_director': st.info('Director sign-off opens after current scientific/cost accuracy approval.');return
     with st.form('director-decision-'+rid+'-'+str(p.get('planning_revision',1))):
-        actor=st.text_input('Named manager/director',state['case']['director'],disabled=True)
-        action=st.selectbox('Project decision',['approve','return','reject'],index=None)
-        reason=st.selectbox('Project reason',POSITIVE['director']+NEGATIVE,index=None)
-        comments=st.text_area('Additional comments or required revision')
-        attest=st.checkbox('I am the named manager/director and authorize only the current project version.')
+        actor=st.text_input('Named manager/director',state['case']['director'],disabled=True,key=sandbox_widget_key('line581','Named manager/director'))
+        action=st.selectbox('Project decision',['approve','return','reject'],index=None,key=sandbox_widget_key('line582','Project decision'))
+        reason=st.selectbox('Project reason',POSITIVE['director']+NEGATIVE,index=None,key=sandbox_widget_key('line583','Project reason'))
+        comments=st.text_area('Additional comments or required revision',key=sandbox_widget_key('line584','Additional comments or required revision'))
+        attest=st.checkbox('I am the named manager/director and authorize only the current project version.',key=sandbox_widget_key('line585','I am the named manager/director and authorize only the current project version.'))
         simulation=st.checkbox('Record a simulated manager approval for TEST DATA only',key='director_simulation_'+rid) if store.run(rid)['mode']=='fixture' else False
         submit=st.form_submit_button('Record project decision')
     if submit:
@@ -630,16 +633,16 @@ def supporting_documents_view(rid,p,state):
 
 
 def supporting_upload_form(rid,p,state,documents,uploaded,upload_key,labels,hint_source,upload_date,hinted_kit):
-        kind=st.selectbox('Document type',documents.KINDS)
-        linked_kit=st.selectbox('Link document to kit (optional)',[None]+list(labels),index=([None]+list(labels)).index(hinted_kit),format_func=lambda value:labels[value] if value else 'Project-wide reference')
-        source_name=st.text_input('Vendor, sender or document source',value=hint_source)
-        source_url=st.text_input('Source website URL (optional)')
+        kind=st.selectbox('Document type',documents.KINDS,key=sandbox_widget_key('line633','Document type'))
+        linked_kit=st.selectbox('Link document to kit (optional)',[None]+list(labels),index=([None]+list(labels)).index(hinted_kit),format_func=lambda value:labels[value] if value else 'Project-wide reference',key=sandbox_widget_key('line634','Link document to kit (optional)'))
+        source_name=st.text_input('Vendor, sender or document source',value=hint_source,key=sandbox_widget_key('line635','Vendor, sender or document source'))
+        source_url=st.text_input('Source website URL (optional)',key=sandbox_widget_key('line636','Source website URL (optional)'))
         a,b=st.columns(2)
         document_date=a.date_input('Quote/email/document date (optional)',value=upload_date('document_date'))
         expires=b.date_input('Expiration / valid-through date (optional)',value=upload_date('expires_on'))
-        notes=st.text_area('Document context / limitations (optional)')
-        include=st.checkbox('Include original file in exported evidence bundle',value=True)
-        actor=st.text_input('Scientist recording the document',state['case']['scientific_reviewer'])
+        notes=st.text_area('Document context / limitations (optional)',key=sandbox_widget_key('line640','Document context / limitations (optional)'))
+        include=st.checkbox('Include original file in exported evidence bundle',value=True,key=sandbox_widget_key('line641','Include original file in exported evidence bundle'))
+        actor=st.text_input('Scientist recording the document',state['case']['scientific_reviewer'],key=sandbox_widget_key('line642','Scientist recording the document'))
         submit=st.form_submit_button('Save document and review suggestions')
         if submit:
             try:
@@ -678,7 +681,7 @@ def supporting_document_review(rid,p,state,documents,kits,labels,records):
         detected={s['candidate_id'] for s in suggestions if s['field']=='catalog' and s.get('candidate_id')}
         proposed_kit=record.get('candidate_id') or (next(iter(detected)) if len(detected)==1 else None)
         with st.form('support_metadata_'+rid+record['id']):
-            reviewed_kit=st.selectbox('Reviewed document kit association',[None]+list(labels),index=([None]+list(labels)).index(proposed_kit),format_func=lambda value:labels[value] if value else 'Project-wide / multiple kits')
+            reviewed_kit=st.selectbox('Reviewed document kit association',[None]+list(labels),index=([None]+list(labels)).index(proposed_kit),format_func=lambda value:labels[value] if value else 'Project-wide / multiple kits',key=sandbox_widget_key('line681','Reviewed document kit association'))
             reviewed_date=st.date_input('Reviewed document date',value=suggested_date('document_date'))
             reviewed_expiry=st.date_input('Reviewed expiration date',value=suggested_date('expires_on'))
             if st.form_submit_button('Confirm document details'):
@@ -713,12 +716,12 @@ def supporting_document_review(rid,p,state,documents,kits,labels,records):
         st.write('Detected supporting text:',chosen['quote'])
     with st.form('support_adopt_'+rid+record['id']+target['id']+field+digest(chosen)[:8]):
         initial=chosen['usd_per_kit'] if chosen and field=='kit_price' else chosen['value'] if chosen else target.get('kit_price') if field=='kit_price' else target.get('reviewer_lead_time') or target.get('lead_time') or ''
-        value=nullable_number('Reviewed price USD per kit',initial,min_value=.01) if field=='kit_price' else st.text_input('Reviewed lead time',initial)
+        value=nullable_number('Reviewed price USD per kit',initial,min_value=.01) if field=='kit_price' else st.text_input('Reviewed lead time',initial,key=sandbox_widget_key('line716','Reviewed lead time'))
         st.caption('A supporting passage is optional. Leave both citation fields blank to record a reviewer estimate associated with this document. Providing a valid passage records field-level source support.')
-        locator=st.text_input('Supporting location (optional PDF page or email section)',chosen['locator'] if chosen else '')
-        quote=st.text_area('Exact supporting passage (optional)',chosen['quote'] if chosen else '',max_chars=400)
-        reviewer=st.text_input('Scientist verifying this value',state['case']['scientific_reviewer'])
-        confirmed=st.checkbox('I am recording a scientist-reviewed value, have considered document date/validity, and checked any optional passage provided.')
+        locator=st.text_input('Supporting location (optional PDF page or email section)',chosen['locator'] if chosen else '',key=sandbox_widget_key('line718','Supporting location (optional PDF page or email section)'))
+        quote=st.text_area('Exact supporting passage (optional)',chosen['quote'] if chosen else '',max_chars=400,key=sandbox_widget_key('line719','Exact supporting passage (optional)'))
+        reviewer=st.text_input('Scientist verifying this value',state['case']['scientific_reviewer'],key=sandbox_widget_key('line720','Scientist verifying this value'))
+        confirmed=st.checkbox('I am recording a scientist-reviewed value, have considered document date/validity, and checked any optional passage provided.',key=sandbox_widget_key('line721','I am recording a scientist-reviewed value, have considered document date/validity, and checked any optional passage provided.'))
         apply=st.form_submit_button('Save reviewed value and recalculate')
     if apply:
         try:
@@ -742,12 +745,12 @@ def updated_intake_view(rid,state):
         else:st.caption('The saved intake version changed, but its normalized values match the previously applied intake.')
         st.caption('Reuses saved kit research, documents and reviewer facts. Recalculates the requested design, volumes, plate/kit allocation, estimates and comparison. Prior packets and decisions remain in history; the revised packet requires fresh approval.')
         with st.form('apply_intake_'+rid+'_'+str(update['current_version'])):
-            actor=st.text_input('Scientist applying updated intake',state['case']['scientific_reviewer'])
+            actor=st.text_input('Scientist applying updated intake',state['case']['scientific_reviewer'],key=sandbox_widget_key('line745','Scientist applying updated intake'))
             confirmed=False;reason=''
             if update['review_fields']:
                 st.info('These changes may affect the retained evidence: '+', '.join(field.replace('_',' ') for field in update['review_fields'])+'. Review its applicability or start a new research run.')
-                confirmed=st.checkbox('I reviewed the retained evidence and accept its reuse for this revised planning scope; no new research will be performed.')
-                reason=st.text_area('Why the retained evidence remains applicable')
+                confirmed=st.checkbox('I reviewed the retained evidence and accept its reuse for this revised planning scope; no new research will be performed.',key=sandbox_widget_key('line749','I reviewed the retained evidence and accept its reuse for this revised planning scope; no new research will be performed.'))
+                reason=st.text_area('Why the retained evidence remains applicable',key=sandbox_widget_key('line750','Why the retained evidence remains applicable'))
             if st.form_submit_button('Apply updated intake and recalculate'):
                 try:
                     engine_action(lambda e:e.apply_updated_intake(rid,actor,scope_confirmed=confirmed,scope_reason=reason,expected_version=update['current_version']))
@@ -765,7 +768,7 @@ def run_view(cid):
             for name,goal in ROLES.items():st.markdown('**'+name.title()+'** — '+goal)
             st.markdown('**Human approvals**')
             for name,responsibility in HUMAN_ROLES.items():st.markdown('**'+name+'** — '+responsibility)
-        mode=st.radio('Run mode',['fixture'] if PUBLIC_DEMO else ['fixture','live'],horizontal=True,format_func=lambda s:'Test data · live-style review' if s=='fixture' else 'Live OpenAI research')
+        mode=st.radio('Run mode',['fixture'] if PUBLIC_DEMO else ['fixture','live'],horizontal=True,format_func=lambda s:'Test data · live-style review' if s=='fixture' else 'Live OpenAI research',key=sandbox_widget_key('line768','Run mode'))
         if mode=='fixture': st.info('New-run setting: Test data. This applies only to Start new run; it does not describe the saved run selected below.')
         if st.button('Start new run',type='primary'):
             settings_path=DATA/'settings.json';settings=json.loads(settings_path.read_text()) if settings_path.exists() else {}
@@ -779,7 +782,7 @@ def run_view(cid):
                 except Exception as exc:st.error(str(exc))
     runs=store.runs(cid)
     if not runs:return
-    rid=st.selectbox('Saved run',[r['id'] for r in runs],format_func=lambda x:x[:12]+' · '+next(r['mode'] for r in runs if r['id']==x))
+    rid=st.selectbox('Saved run',[r['id'] for r in runs],format_func=lambda x:x[:12]+' · '+next(r['mode'] for r in runs if r['id']==x),key=sandbox_widget_key('line782','Saved run'))
     run=store.run(rid);state=run['data'];p=state.get('packet',{})
     if p and not run['stopped'] and state.get('status') in ('awaiting_scientific','awaiting_director','authorized'):updated_intake_view(rid,state)
     if p and not run['stopped'] and state.get('status') in ('awaiting_scientific','awaiting_director','authorized') and p.get('cost_assumptions',{}).get('estimate_rules_version',0)<2:
@@ -876,7 +879,7 @@ def run_evidence_view(rid,p,state,run,cid):
     if not flags:st.success('No current review flags.')
     if flags:
         with st.form('review_flags_'+rid):
-            review_actor=st.text_input('Scientist reviewing flags',state['case']['scientific_reviewer'])
+            review_actor=st.text_input('Scientist reviewing flags',state['case']['scientific_reviewer'],key=sandbox_widget_key('line879','Scientist reviewing flags'))
             reviews={}
             for f in sorted(flags,key=lambda f:(not f.get('requires_attention'),f.get('section',''))):
                 fid=f['id']
@@ -927,10 +930,10 @@ def run_evidence_view(rid,p,state,run,cid):
         eligible=[f for f in p.get('findings',[]) if f.get('origin')=='agent' and f.get('id')]
         if eligible:
             with st.form('resolve_finding_'+rid):
-                finding=st.selectbox('Finding to resolve',eligible,format_func=lambda f:f['section']+' · '+f['message'][:130])
-                actor=st.text_input('Reviewer resolving finding',state['case']['scientific_reviewer'])
-                reason=st.text_area('Resolution reason')
-                evidence=st.text_input('Supporting evidence reference (source ID, document URL or controlled record)')
+                finding=st.selectbox('Finding to resolve',eligible,format_func=lambda f:f['section']+' · '+f['message'][:130],key=sandbox_widget_key('line930','Finding to resolve'))
+                actor=st.text_input('Reviewer resolving finding',state['case']['scientific_reviewer'],key=sandbox_widget_key('line931','Reviewer resolving finding'))
+                reason=st.text_area('Resolution reason',key=sandbox_widget_key('line932','Resolution reason'))
+                evidence=st.text_input('Supporting evidence reference (source ID, document URL or controlled record)',key=sandbox_widget_key('line933','Supporting evidence reference (source ID, document URL or controlled record)'))
                 if st.form_submit_button('Record resolution and reopen review'):
                     try:engine_action(lambda engine:engine.resolve_finding(rid,actor,finding['id'],reason,evidence));st.rerun()
                     except Exception as exc:st.error(str(exc))
@@ -939,17 +942,17 @@ def run_evidence_view(rid,p,state,run,cid):
         agent_findings=[f for f in scoped_findings(p) if f.get('origin')=='agent' and f.get('id')]
         if agent_findings:
             with st.form('classify_finding_'+rid):
-                finding=st.selectbox('Finding to classify',agent_findings,format_func=lambda f:f['message'][:150])
-                scope=st.selectbox('Finding applies to',['project','selected_kit','alternative_only'])
+                finding=st.selectbox('Finding to classify',agent_findings,format_func=lambda f:f['message'][:150],key=sandbox_widget_key('line942','Finding to classify'))
+                scope=st.selectbox('Finding applies to',['project','selected_kit','alternative_only'],key=sandbox_widget_key('line943','Finding applies to'))
                 kits={k['id']:k['name']+' / '+k['catalog'] for k in p.get('candidates',[])}
-                ids=st.multiselect('Kits affected by this finding',list(kits),format_func=lambda cid:kits[cid])
-                affects=st.checkbox('This concern undermines the selection rationale itself')
-                category=st.selectbox('Finding type',['planning','instrument_availability','instrument_execution','instrument_compatibility','essential_configuration','expected_concentration_unknown','range_coverage_mismatch'])
-                instrument_model=st.text_input('Instrument model concerned (if applicable)')
-                required_configuration=st.text_input('Specific essential configuration gap (if applicable)')
-                actor=st.text_input('Reviewer classifying finding',state['case']['scientific_reviewer'])
-                reason=st.text_area('Classification reason')
-                evidence=st.text_input('Evidence supporting this classification')
+                ids=st.multiselect('Kits affected by this finding',list(kits),format_func=lambda cid:kits[cid],key=sandbox_widget_key('line945','Kits affected by this finding'))
+                affects=st.checkbox('This concern undermines the selection rationale itself',key=sandbox_widget_key('line946','This concern undermines the selection rationale itself'))
+                category=st.selectbox('Finding type',['planning','instrument_availability','instrument_execution','instrument_compatibility','essential_configuration','expected_concentration_unknown','range_coverage_mismatch'],key=sandbox_widget_key('line947','Finding type'))
+                instrument_model=st.text_input('Instrument model concerned (if applicable)',key=sandbox_widget_key('line948','Instrument model concerned (if applicable)'))
+                required_configuration=st.text_input('Specific essential configuration gap (if applicable)',key=sandbox_widget_key('line949','Specific essential configuration gap (if applicable)'))
+                actor=st.text_input('Reviewer classifying finding',state['case']['scientific_reviewer'],key=sandbox_widget_key('line950','Reviewer classifying finding'))
+                reason=st.text_area('Classification reason',key=sandbox_widget_key('line951','Classification reason'))
+                evidence=st.text_input('Evidence supporting this classification',key=sandbox_widget_key('line952','Evidence supporting this classification'))
                 if st.form_submit_button('Save classification as new review revision'):
                     try:engine_action(lambda engine:engine.classify_finding(rid,actor,finding['id'],scope,ids,affects,reason,evidence,category=category,instrument_model=instrument_model,required_configuration=required_configuration));st.rerun()
                     except Exception as exc:st.error(str(exc))
@@ -970,8 +973,8 @@ def export_view(rid,p,state,run,cid):
     with st.expander('Client report details'):
         details=p.get('report_details',{})
         with st.form('report_details_'+rid):
-            client_name=st.text_input('Client / company name (optional)',details.get('client_name',''))
-            project_reference=st.text_input('Client project reference (optional)',details.get('project_reference',''))
+            client_name=st.text_input('Client / company name (optional)',details.get('client_name',''),key=sandbox_widget_key('line973','Client / company name (optional)'))
+            project_reference=st.text_input('Client project reference (optional)',details.get('project_reference',''),key=sandbox_widget_key('line974','Client project reference (optional)'))
             st.caption('Save these before approval. Changes create a report revision; existing decisions remain in history.')
             if st.form_submit_button('Save client report details'):
                 try:
@@ -1028,7 +1031,7 @@ with st.sidebar:
             st.caption('Deleted '+project['deleted_at'][:10])
             if st.button('Restore to Active',key='restore_project_'+project['id'],width='stretch',help='Restore this project with all saved runs and evidence.'):
                 store.restore_case(project['id']);st.session_state['case_id']=project['id'];st.rerun()
-    page=st.radio('View',['Intake','Agent workspace'] if PUBLIC_DEMO else ['Intake','Agent workspace','Settings'])
+    page=st.radio('View',['Intake','Agent workspace'] if PUBLIC_DEMO else ['Intake','Agent workspace','Settings'],key=sandbox_widget_key('line1031','View'))
     st.caption('Whole-microlitre serial preparation · self-attested roles · no external purchasing or instrument actions')
 if page!='Agent workspace':
     st.title('Bioanalytical Advisory')
