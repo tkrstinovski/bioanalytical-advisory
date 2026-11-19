@@ -291,6 +291,9 @@ class Engine:
             'feedback':s.get('feedback',[])+[feedback],
             'queue':[{'role':r,'objective':'Address returned section '+section+' using the saved finalists and evidence.'} for r in roles]})
     def start(self,cid,mode,settings):
+        if mode!='fixture':
+            from .sandbox import forbid_live
+            forbid_live(self.store)
         rid=self.store.create_run(cid,mode)
         state=State(run_id=rid,case=self.store.case(cid)['data'],mode=mode,settings=settings,iteration=0,results={},feedback=[])
         state['applied_intake']=copy.deepcopy(state['case'])

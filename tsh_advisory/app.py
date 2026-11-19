@@ -35,9 +35,47 @@ from tsh_advisory.candidate_grid import grid_rows,collect_updates,render_grid
 from tsh_advisory.kit_library import display_kit
 
 ROOT=Path(__file__).resolve().parent
-DATA=Path(os.getenv('BIO_ADVISORY_DATA',str(ROOT/'runs')))
 st.set_page_config(page_title='Bioanalytical Advisory',page_icon='🧬',layout='wide')
+from tsh_advisory import sandbox
+PUBLIC_DEMO=sandbox.enabled()
+if PUBLIC_DEMO:
+    @st.cache_resource
+    def demo_cleanup_worker():
+        sandbox.cleanup()
+        sandbox.start_janitor()
+        return True
+    demo_cleanup_worker()
+    token=st.session_state.get('_demo_session')
+    if token and not sandbox.session_path(token).exists():
+        st.session_state.clear()
+        token=None
+    if not token:
+        token=sandbox.create_session()
+        st.session_state['_demo_session']=token
+    DATA=sandbox.session_path(token)
+    sandbox.touch(token)
+    @st.fragment(run_every=60)
+    def demo_heartbeat():
+        sandbox.touch(st.session_state['_demo_session'])
+    demo_heartbeat()
+    st.info('Public synthetic sandbox · your edits are private to this browser session · no API key or paid research · reset anytime. Closing the tab abandons your session; inactive data is removed after one hour while the server is running, or on its next start.')
+    if st.button('End demo / Reset',key='_reset_demo'):
+        sandbox.remove_session(token)
+        st.session_state.clear()
+        st.rerun()
+else:
+    DATA=Path(os.getenv('BIO_ADVISORY_DATA',str(ROOT/'runs')))
 store=Store(DATA)
+if PUBLIC_DEMO and not store.cases() and not store.deleted_cases():
+    demo_case=tsh_case().model_dump()
+    demo_case.update(title='Synthetic demonstration — editable session copy',scientific_reviewer='Demo Scientist',director='Demo Director')
+    demo_cid=store.save_case(demo_case)
+    demo_engine=Engine(store)
+    try:
+        demo_engine.start(demo_cid,'fixture',{'manual_demo':True,'planning_version':'lot-planning-v3'})
+    finally:
+        demo_engine.close()
+    st.session_state['case_id']=demo_cid
 
 def engine_action(fn):
     engine=Engine(store)
@@ -726,7 +764,7 @@ def run_view(cid):
             for name,goal in ROLES.items():st.markdown('**'+name.title()+'** — '+goal)
             st.markdown('**Human approvals**')
             for name,responsibility in HUMAN_ROLES.items():st.markdown('**'+name+'** — '+responsibility)
-        mode=st.radio('Run mode',['fixture','live'],horizontal=True,format_func=lambda s:'Test data · live-style review' if s=='fixture' else 'Live OpenAI research')
+        mode=st.radio('Run mode',['fixture'] if PUBLIC_DEMO else ['fixture','live'],horizontal=True,format_func=lambda s:'Test data · live-style review' if s=='fixture' else 'Live OpenAI research')
         if mode=='fixture': st.info('New-run setting: Test data. This applies only to Start new run; it does not describe the saved run selected below.')
         if st.button('Start new run',type='primary'):
             settings_path=DATA/'settings.json';settings=json.loads(settings_path.read_text()) if settings_path.exists() else {}
@@ -959,7 +997,7 @@ def export_view(rid,p,state,run,cid):
 
 with st.sidebar:
     st.header('Projects')
-    if st.button('New blank project'):
+    if not PUBLIC_DEMO and st.button('New blank project'):
         st.session_state['case_id']=store.save_case(Intake(title='Untitled project').model_dump());st.rerun()
     if st.button('New mouse TSH test case'):
         st.session_state['case_id']=store.save_case(tsh_case().model_dump());st.rerun()
@@ -989,7 +1027,7 @@ with st.sidebar:
             st.caption('Deleted '+project['deleted_at'][:10])
             if st.button('Restore to Active',key='restore_project_'+project['id'],width='stretch',help='Restore this project with all saved runs and evidence.'):
                 store.restore_case(project['id']);st.session_state['case_id']=project['id'];st.rerun()
-    page=st.radio('View',['Intake','Agent workspace','Settings'])
+    page=st.radio('View',['Intake','Agent workspace'] if PUBLIC_DEMO else ['Intake','Agent workspace','Settings'])
     st.caption('Whole-microlitre serial preparation · self-attested roles · no external purchasing or instrument actions')
 if page!='Agent workspace':
     st.title('Bioanalytical Advisory')

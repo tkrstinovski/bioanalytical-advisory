@@ -135,6 +135,8 @@ class Tools:
 
 class LiveProvider:
     def __init__(self,store,rid,model,rates,max_calls=40):
+        from .sandbox import forbid_live
+        forbid_live(store)
         from openai import OpenAI
         if not os.getenv('OPENAI_API_KEY'): raise ValueError('Configure OPENAI_API_KEY locally before live mode.')
         if not model.strip(): raise ValueError('Choose an accessible model ID in Settings.')
