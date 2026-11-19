@@ -1,5 +1,13 @@
 # Streamlit Community Cloud deployment
 
+## Public synthetic sandbox
+
+The prepared deployment now includes `.public-sandbox`. This marker makes the existing `tsh_advisory/app.py` entry point synthetic-only, isolates each visitor in a random server-side session directory, hides credentials/settings, and rejects paid research in Engine and LiveProvider. It does not expose local saved projects. Alternatively use `streamlit_demo.py` as the cloud entry point. Do not remove both protections on a public deployment.
+
+Visitors can edit their session copy, recalculate and export synthetic reports. Reset deletes that copy immediately. Open tabs send a heartbeat; abandoned data expires after one hour, swept every minute while the process is running and at startup. Browser close events are not used as a deletion guarantee. Reconnecting the same WebSocket session may preserve edits until reset or expiry. Downloads already saved by the visitor are outside server cleanup. Names/approvals in the sandbox are simulated identities, not authenticated sign-offs.
+
+For this public demo, do not configure an OpenAI API key. Existing private cloud history is not migrated to anonymous visitors; local projects remain separate. Public sharing is configured in Streamlit, not by making the code repository public.
+
 Create a private GitHub repository named `bioanalytical-advisory` and upload only the contents of the prepared deployment ZIP, after extracting it. Do not upload the ZIP itself or the entire original project folder.
 
 In https://share.streamlit.io choose Create app and select the repository, branch `main`, and main file `tsh_advisory/app.py`. Under Advanced settings choose Python 3.14 to match the locally tested runtime, if available. The dependency versions are taken from the working local environment; the cloud installation still needs verification.
