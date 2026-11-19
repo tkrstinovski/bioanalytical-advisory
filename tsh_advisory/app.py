@@ -15,7 +15,8 @@ _modules.append('supporting_documents')
 _modules.append('document_extraction')
 _modules.append('intake_updates')
 _signature=tuple((Path(__file__).parent/(name+'.py')).stat().st_mtime_ns for name in _modules)
-if getattr(package,'_source_signature',None)!=_signature:
+_anonymous_demo=(Path(__file__).resolve().parents[1]/'.public-sandbox').is_file() or os.getenv('BIO_ADVISORY_PUBLIC_DEMO','').lower() in ('1','true','yes')
+if not _anonymous_demo and getattr(package,'_source_signature',None)!=_signature:
     for _name in _modules:
         _module=sys.modules.get('tsh_advisory.'+_name)
         if _module is not None:importlib.reload(_module)
