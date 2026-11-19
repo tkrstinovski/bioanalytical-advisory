@@ -1,0 +1,7 @@
+__pycache__/
+.streamlit/secrets.toml
+.env
+tsh_advisory/runs/
+*.db
+*.sqlite
+*.sqlite3
