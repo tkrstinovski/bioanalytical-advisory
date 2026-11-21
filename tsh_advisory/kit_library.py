@@ -40,7 +40,7 @@ def manual_demo(case):
         result['sources'][source_id]=dict(result['sources']['fixture-source'],id=source_id,title=metadata['name']+' manual-indexed test record',url=metadata['manual_url'],retrieved_at=metadata['manual_checked_at'],text=text,content_hash=digest(text))
         species=case.species if case.species.casefold() in metadata['species'] else metadata['species']
         candidate=dict(id=f'manual-demo-{i}',manufacturer='MilliporeSigma',platform='Bio-Plex',analyte='TSH',matrix='serum',
-            required_model='',handling_ul=15,kit_price=None,price_source='',wells_per_kit=96,
+            required_model='',handling_ul=20,kit_price=None,price_source='',wells_per_kit=96,
             gates={g:'unresolved' for g in ('identity','matrix','instrument','range','volume')},evidence={},limitations=['Manual-indexed demonstration; local compatibility and suitability require review.'])
         candidate.update(metadata);candidate['species']=species
         result['candidates'].append(candidate)

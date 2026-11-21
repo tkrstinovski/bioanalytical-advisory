@@ -207,10 +207,14 @@ class Engine:
         if s.get('continuation'):
             known={c['id'] for c in candidates}
             candidates.extend(copy.deepcopy(c) for c in s.get('other_candidates',[]) if c['id'] not in known)
-        from .manual_facts import extract
+        from .manual_facts import extract,vendor_dispatch
         for candidate in candidates:
             proposals=extract(candidate,r.get('researcher',{}).get('sources',{}))
             candidate['manual_extraction']=proposals
+            dispatch=vendor_dispatch(candidate,r.get('researcher',{}).get('sources',{}))
+            if dispatch:
+                candidate['manual_extraction']['lead_time']=dispatch
+                candidate.update(lead_time=dispatch['value'],lead_time_quote=dispatch['quote'],lead_time_source_id=dispatch['source_id'],lead_time_checked_at=dispatch['checked_at'])
             for field in ('well_input_ul','dilution_factor','assay_duration'):
                 if field not in proposals or candidate.get('reviewer_edits',{}).get(field):continue
                 if field=='assay_duration' or candidate.get(field) in (None,''):

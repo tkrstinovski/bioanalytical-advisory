@@ -88,9 +88,10 @@ def public_lead_time(packet,kit):
         if detail['inspectable'] and not detail['needs_recheck']:
             return kit['reviewer_lead_time']+' · scientist-reviewed source passage; '+detail['locator']+'; source '+detail['source_id']
         return kit['reviewer_lead_time']+' · reviewer estimate (not public vendor confirmation)'
-    if not kit or not kit.get('lead_time'):return 'Public lead time not available'
+    if not kit or not kit.get('lead_time'):return 'Public lead time not retrieved'
     source=packet.get('sources',{}).get(kit.get('lead_time_source_id'))
-    if not source or kit['lead_time'] not in source.get('text','') or source.get('synthetic'):
+    quote=kit.get('lead_time_quote') or kit['lead_time']
+    if not source or quote not in source.get('text','') or source.get('synthetic') or (source.get('content_hash') and source['content_hash']!=digest(source.get('text',''))):
         if kit.get('reviewer_lead_time'):return kit['reviewer_lead_time']+' · reviewer estimate (not public vendor confirmation)'
         return 'Lead time unverified; public source required'
     return kit['lead_time']+' · source '+source['id']+' · checked '+(kit.get('lead_time_checked_at') or source['retrieved_at'])

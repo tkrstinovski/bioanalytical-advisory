@@ -120,8 +120,15 @@ class Tools:
             return source
         elif 'html' in typ or 'text/plain' in typ:
             soup=BeautifulSoup(raw,'html.parser')
+            structured=[]
+            for node in soup.find_all('script',type='application/ld+json'):
+                try:
+                    data=json.loads(node.get_text())
+                    structured.append(json.dumps(data,ensure_ascii=False)[:12000])
+                except (ValueError,TypeError):pass
             for n in soup(['script','style','nav','footer']): n.decompose()
             text=soup.get_text(' ',strip=True)
+            if structured:text+='\nRetained public structured page data (JSON-LD):\n'+'\n'.join(structured)
         else: raise ValueError('Unsupported source content type.')
         sid=digest(final)[:16]
         source=dict(id=sid,title=final,url=final,owner=self.owner,publisher=urlparse(final).hostname,

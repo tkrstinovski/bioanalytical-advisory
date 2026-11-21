@@ -46,3 +46,10 @@ def extract(kit,sources):
             proposals['assay_duration']={'value':f'{total} min timed incubation/development ({detail} min); excludes untimed setup, preparation, washing and reading','steps':steps,'source_id':sid,'method':'Sum of explicit timed assay-procedure steps; nominal times where tolerances are given'}
         break
     return proposals
+
+def vendor_dispatch(kit,sources):
+    for sid,source in sources.items():
+        if _url(source.get('url'))!=_url(kit.get('vendor_url')) or source.get('content_hash')!=digest(source.get('text','')):continue
+        match=re.search(r'\bDispatch\s+Time\s*:\s*(?:About\s+)?\d+(?:\s*[-–]\s*\d+)?\s*(?:(?:working|business|calendar)\s+)?(?:days?|weeks?)\b',source.get('text',''),re.I)
+        if match:return {'value':match.group(),'quote':match.group(),'source_id':sid,'checked_at':source.get('retrieved_at',''),'locator':f'Product-page dispatch statement; characters {match.start()+1}–{match.end()}'}
+    return None

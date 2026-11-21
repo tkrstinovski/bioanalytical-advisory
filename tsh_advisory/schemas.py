@@ -131,6 +131,7 @@ class Candidate(Strict):
     limitations: list[str] = Field(default_factory=list)
     lead_time: str | None = None
     lead_time_source_id: str = ''
+    lead_time_quote: str = ''
     lead_time_checked_at: str = ''
     vendor_url: str = ''
     manual_url: str = ''
