@@ -1,7 +1,7 @@
 """Concise review presentation; full findings stay in the audit record."""
 import re
 from urllib.parse import quote
-from .names import matches,instrument_match as canonical_instrument_match
+from .names import matches,species_parts,instrument_match as canonical_instrument_match
 
 def species_match(requested,supported):
     return matches(requested,supported,'species')
@@ -73,12 +73,13 @@ def comparison_rows(packet,candidates,lead_time):
     output={}
     for k in candidates:
         manual,checked=manual_reference(packet,k)
+        species,_=species_parts(k.get('species',''))
         link=lambda title,url:f'[{title}]({quote(url,safe=":/?=&%#@+;,~.-_")})' if url else 'Not provided'
         output[k['name']+' · '+k['catalog']]={
           'Manufacturer':k['manufacturer'],'Platform':k['platform'],'Instrument (kit manual/vendor)':vendor_instrument_text(packet,k),
           'Instrument availability (intake)':'; '.join(f'{platform}: {model}' for platform,model in packet.get('case',{}).get('instruments',{}).items() if str(model).strip()) or 'No instruments listed in intake',
           'Execution readiness':'Routine setup, calibration/qualification and scheduling checked before laboratory execution; not a planning approval requirement.',
-          'Analyte':k['analyte'],'Species':k['species'],'Species strain (kit documentation)':k.get('species_strain') or 'Not specified',
+          'Analyte':k['analyte'],'Species':species,'Species strain (kit documentation)':k.get('species_strain') or 'Not specified',
           'Requested strain (intake)':packet.get('case',{}).get('species_strain') or 'Not specified — no strain restriction',
           'Matrix':k['matrix'],'Kit curve range':k.get('curve_range') or 'Reviewer input required',
           'Expected study concentrations':'Unknown at planning; not required for approval. Manufacturer range is listed separately.',

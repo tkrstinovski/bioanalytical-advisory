@@ -992,7 +992,7 @@ def export_view(rid,p,state,run,cid):
     selected=next((display_kit(k) for k in p.get('candidates',[]) if k['id']==p.get('selected_kit')),None)
     manual_url=manual_reference(p,selected)[0] if selected else ''
     attach_manual=st.checkbox('Attach selected kit manual to PDF report and evidence bundle',value=bool(manual_url),disabled=not bool(manual_url),key='attach_manual_'+rid)
-    export_options=(packet_hash(p),attach_manual,'client-visual-parity-v18-compact-reader-notes')
+    export_options=(packet_hash(p),attach_manual,'client-visual-parity-v19-species-labels')
     if st.session_state.get('export_options_'+rid)!=export_options:
         st.session_state.pop('pdf_'+rid,None);st.session_state.pop('export_'+rid,None)
         st.session_state['export_options_'+rid]=export_options

@@ -52,6 +52,7 @@ def grid_rows(packet,candidates,lead_time):
             cid=kit['id'];field=FIELDS.get(label);value=values.get(label,'')
             if field:
                 value=kit.get(field)
+                if field in ('species','reviewer_notes'):value=values.get(label,value)
                 if field=='reviewer_lead_time' and not value:value=lead_time(packet,kit)
                 if field=='vendor_instruments' and not value:value=values.get(label,'')
                 if field=='manual_url':value=manual_reference(packet,kit)[0]

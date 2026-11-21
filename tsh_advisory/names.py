@@ -6,7 +6,13 @@ def clean(value):
     value=unicodedata.normalize('NFKC',str(value)).casefold()
     return re.sub(r'[^a-z0-9]+',' ',value).strip()
 
+def species_parts(value):
+    """Separate a species label from appended vendor commentary, retaining both."""
+    parts=re.split(r';\s*(?=(?:vendor|manufacturer|calibrat\w*|standard\w*|reference material)\b)',str(value or ''),maxsplit=1,flags=re.I)
+    return parts[0].strip(),parts[1].strip() if len(parts)>1 else ''
+
 def canonical(value,kind):
+    if kind=='species':value=species_parts(value)[0]
     original=str(value)
     if '(' in original and ')' in original:
         parts=[p.strip() for p in re.split(r'[()]',original) if p.strip()]
