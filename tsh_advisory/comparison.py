@@ -80,8 +80,6 @@ def comparison_rows(packet,candidates,lead_time):
           'Execution readiness':'Routine setup, calibration/qualification and scheduling checked before laboratory execution; not a planning approval requirement.',
           'Analyte':k['analyte'],'Species':k['species'],'Species strain (kit documentation)':k.get('species_strain') or 'Not specified',
           'Requested strain (intake)':packet.get('case',{}).get('species_strain') or 'Not specified — no strain restriction',
-          'Wavelength (manual/vendor)':k.get('wavelength') or 'Not documented — informational',
-          'Detection mode (manual/vendor)':k.get('detection_mode') or 'Not documented — informational',
           'Matrix':k['matrix'],'Kit curve range':k.get('curve_range') or 'Reviewer input required',
           'Expected study concentrations':'Unknown at planning; not required for approval. Manufacturer range is listed separately.',
           'Common-unit curve range':normalized_curve(k.get('curve_range','')),'Assay input (µL/well)':k.get('well_input_ul') if k.get('well_input_ul') is not None else 'Not documented','Manual dilution factor':k.get('dilution_factor') if k.get('dilution_factor') is not None else 'Not documented',
@@ -91,4 +89,7 @@ def comparison_rows(packet,candidates,lead_time):
           'Vendor website':link('Vendor website',k.get('vendor_url','')),'Kit manual':link('Kit manual',manual)+(' · checked '+checked if checked else ''),
           'Assay duration (manual)':k.get('assay_duration') or 'Not documented yet','Required supporting equipment':'; '.join(k.get('required_equipment',[])) or 'Not documented yet',
           'Lead time':lead_time(packet,k),'Evidence sources':'\n'.join(link('Kit manual' if url==manual else 'Vendor website' if url==k.get('vendor_url') else 'Kit-specific source '+str(i+1),url) for i,url in enumerate(comparison_sources(packet,k))) or 'Not recorded'}
+        if not str(packet.get('case',{}).get('species_strain') or '').strip():
+            output[k['name']+' · '+k['catalog']].pop('Species strain (kit documentation)',None)
+            output[k['name']+' · '+k['catalog']].pop('Requested strain (intake)',None)
     return output
