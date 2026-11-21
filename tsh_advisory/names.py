@@ -1,6 +1,6 @@
 """Versioned, conservative equivalence rules. Aliases never establish assay suitability."""
 import re,unicodedata
-VERSION='names-v2-optional-strain-primate-aliases'
+VERSION='names-v3-elisa-spectramax-family'
 
 def clean(value):
     value=unicodedata.normalize('NFKC',str(value)).casefold()
@@ -19,6 +19,7 @@ def canonical(value,kind):
         values={canonical(p,kind) for p in parts}
         if len(values)==1:return values.pop()
     value=clean(value);compact=value.replace(' ','')
+    if kind=='platform' and re.search(r'\belisa\b',value):return 'spectramax'
     registry={
       'species':{'mouse':['mouse','mice','murine','mus musculus','mouse mus musculus'],'rat':['rat','rats','rattus norvegicus','rat rattus norvegicus'],'human':['human','humans','homo sapiens','human homo sapiens'],
                  'nhp':['nhp','nhps','monkey','monkeys','non-human primate','nonhuman primate','non human primates','nonhuman primates'],

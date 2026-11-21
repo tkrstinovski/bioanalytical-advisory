@@ -215,11 +215,11 @@ class Engine:
             if dispatch:
                 candidate['manual_extraction']['lead_time']=dispatch
                 candidate.update(lead_time=dispatch['value'],lead_time_quote=dispatch['quote'],lead_time_source_id=dispatch['source_id'],lead_time_checked_at=dispatch['checked_at'])
-            for field in ('well_input_ul','dilution_factor','assay_duration'):
+            for field in ('well_input_ul','dilution_factor','curve_range','assay_duration'):
                 if field not in proposals or candidate.get('reviewer_edits',{}).get(field):continue
                 if field=='assay_duration' or candidate.get(field) in (None,''):
                     candidate[field]=proposals[field]['value']
-            for field in ('well_input_ul','dilution_factor'):
+            for field in ('well_input_ul','dilution_factor','curve_range'):
                 proposal=proposals.get(field)
                 if proposal and candidate.get(field)==proposal['value'] and not candidate.get('cell_evidence',{}).get(field,{}).get('source_id'):
                     candidate.setdefault('auto_evidence',{})[field]={**proposal,'value_at_review':candidate[field],'mapping_version':'manual-procedure-v1'}

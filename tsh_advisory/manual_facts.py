@@ -13,6 +13,22 @@ def extract(kit,sources):
     for sid,src in sources.items():
         if _url(src.get('url'))!=_url(kit.get('manual_url')) or src.get('content_hash')!=digest(src.get('text','')):continue
         text=src.get('text','')
+        # A component table can list standards individually rather than give a
+        # contiguous range sentence. Keep that basis explicit.
+        for heading in re.finditer(r'(?im)^\s*[^\n]{0,45}\bStandards\s*$',text):
+            tail=text[heading.end():heading.end()+600]
+            boundary=re.search(r'(?im)^\s*(?:Positive Control|Negative Control|TMB|Stop Solution|Materials Required)',tail)
+            if boundary:tail=tail[:boundary.start()]
+            levels=list(re.finditer(r'\b(\d+(?:\.\d+)?)\s*(ng|pg|µg|ug)\s*/\s*ml\b',tail,re.I))
+            if len(levels)<3 or len({m.group(2).casefold() for m in levels})!=1:continue
+            values=sorted({float(m.group(1)) for m in levels if float(m.group(1))>0})
+            if len(values)<3:continue
+            unit=levels[0].group(2)+' /mL'
+            value=f'{values[0]:g}–{values[-1]:g} '+unit.replace(' /','/')+' (supplied standards)'
+            record=_record(text,heading.start(),heading.end()+levels[-1].end(),sid,value)
+            record.update(standard_levels=values,basis='Supplied nonzero calibrator concentrations; not independently validated LLOQ/ULOQ')
+            proposals['curve_range']=record
+            break
         headings=list(re.finditer(r'(?im)^\s*(?:\d+\.?\s*)?(?:Detailed\s+)?ASSAY\s+PROCEDURE[^\n]*',text))
         detailed=[h for h in headings if 'detailed' in h.group().casefold()]
         eligible=[h for h in headings if h.start()>1000 and 'summary' not in h.group().casefold()]
@@ -32,6 +48,18 @@ def extract(kit,sources):
             if m:
                 value=float(m.group(1).replace(',',''))*(1000 if len(m.groups())>1 and m.group(2) else 1)
                 proposals['dilution_factor']=_record(text,m.start(),m.end(),sid,value);break
+        if 'dilution_factor' not in proposals:
+            heading=re.search(r'Recommended\s+Sample\s+Dilution\s+Ratio',text,re.I)
+            if heading:
+                table=text[heading.end():heading.end()+1200]
+                rows=list(re.finditer(r'(?:Healthy\s+)?(serum|plasma)\s+1\s*[:/]\s*([\d,]+)\s*[-–]\s*1\s*[:/]\s*([\d,]+)',table,re.I))
+                relevant=[m for m in rows if m.group(1).casefold() in str(kit.get('matrix','')).casefold()]
+                ranges={(float(m.group(2).replace(',','')),float(m.group(3).replace(',',''))) for m in relevant}
+                if len(ranges)==1:
+                    low,high=ranges.pop();m=relevant[0]
+                    record=_record(text,heading.end()+m.start(),heading.end()+m.end(),sid,low)
+                    record.update(recommended_minimum=low,recommended_maximum=high,basis='Lowest denominator in vendor recommended sample-dilution range; planning starting point, not validated study dilution')
+                    proposals['dilution_factor']=record
         steps=[]
         pattern=r'\bincubat(?:e|ion)\b[^.;]{0,150}?\b(?:for|within)\s+(?:[a-z]+\s+){0,3}\(?(\d+)(?:\s*[-–]\s*(\d+))?(?:\s*±\s*\d+)?\)?\s*(minutes?|mins?|hours?|hrs?)\b'
         for m in re.finditer(pattern,section,re.I):
