@@ -120,6 +120,7 @@ class Engine:
             context['selection_rubric']='Explain comparative trade-offs, not five generic advantages. Species/analyte/matrix are eligibility facts; compare sample consumption, pipettable preparation, kit-manual workflow/equipment, evidence strength, same-scope cost and lead time. Missing competitor facts do not establish superiority. No fabricated scores.'
             context['name_matching']='Use canonical species/analyte/matrix aliases and normalized manufacturer/platform names. Mus musculus = mouse; Rattus norvegicus = rat; thyroid stimulating hormone = TSH; Bio-Plex = BioPlex. Formatting differences are not incompatibilities. Do not equate different instrument models or infer performance from name similarity. Cite actual manual support.'
             context['species_field_format']='Candidate species must contain only the documented species name(s), e.g. Monkey. Do not append vendor calibration commentary to species, and do not relocate that commentary into reviewer_notes/evidence. Preserve original source snapshots; the comparison species cell is only the species label.'
+            context['product_page_policy']='vendor_url must point to the specific kit/catalog product page when available, not the vendor homepage. Check that page for the matching kit size and public unit price before reporting public pricing unavailable. Retain the price passage, currency, package size, source ID and checked date. A blocked/failed page is a retrieval limitation, not proof that the price is not public. Do not use prices from related products.'
             context['optional_strain_and_reader_policy']='NHP, Monkey and non-human primate are equivalent broad naming labels. Cyno/cynomolgus/Macaca fascicularis are aliases; rhesus/Macaca mulatta are aliases. Do not conflate explicit cynomolgus and rhesus species. Store any kit strain restriction separately as species_strain. Intake species_strain is OPTIONAL: blank means no strain restriction and must never produce missing-strain, species-mismatch or strain-mismatch findings. Only flag a documented explicit strain conflict when intake strain is provided and kit strain differs; undocumented kit strain is not a mismatch. Microplate reader, microtitre plate reader and microtiter plate reader are SpectraMax family naming equivalents, not exact model specifications. Extract wavelength and detection_mode into candidate fields from manual/vendor when available. These two fields are informational for scientist review: neither absent values nor differing wavelength/detection mode produce mismatch findings, eligibility penalties or approval blockers. Preserve the documented values without claiming verified equipment capability.'
             context['planning_boundaries']='Intake instruments are the available instruments. List vendor/manual instrument requirements separately; scientist confirms the equipment arrangement at approval. Instrument compatibility, configuration and readiness are advisory, not automatic gates. Assay calibration standards and QCs remain part of the plan. Expected study concentrations are unknown by design and are NOT an approval requirement: use category expected_concentration_unknown for that planning note. Always report and cite the manufacturer curve range. Do not fail the range gate solely because study concentrations are unknown. A documented known range problem uses category range_coverage_mismatch and remains a planning finding. Split mixed findings into separate issues.'
             context['instrument_policy']='Report vendor_instruments only from the kit manual/vendor; never copy intake instruments into that field or infer brand/model support from a platform name. Intake instruments are a separate availability list. Do not require agents to match instruments, models or platforms; do not fail instrument gates or planning approval because of missing/mismatched instrument information. Instrument compatibility, essential configuration and readiness are advisory notes under the instrument finding categories. The named scientist confirms the arrangement at recommendation approval. Continue reporting documented requirements and concerns without asserting a match. This instrument policy supersedes any earlier instrument matching requirement.'
@@ -175,6 +176,7 @@ class Engine:
             if role in ('researcher','platform'):
                 previous={c['id']:c for c in s.get('packet',{}).get('candidates',[])}
                 for c in output.get('candidates',[]):
+                    if not c.get('reviewer_edits',{}).get('handling_ul'):c['handling_ul']=20
                     c['retained_manual']=copy.deepcopy(previous.get(c['id'],{}).get('retained_manual',{})) if previous.get(c['id'],{}).get('manual_url')==c.get('manual_url') else {}
                     for field_name in ('reviewer_edits','cell_evidence'):c[field_name]=copy.deepcopy(previous.get(c['id'],{}).get(field_name,{}))
             if role in ('platform','researcher'): output['candidates']=[Candidate.model_validate(c).model_dump() for c in output.get('candidates',[])]
@@ -205,6 +207,18 @@ class Engine:
         if s.get('continuation'):
             known={c['id'] for c in candidates}
             candidates.extend(copy.deepcopy(c) for c in s.get('other_candidates',[]) if c['id'] not in known)
+        from .manual_facts import extract
+        for candidate in candidates:
+            proposals=extract(candidate,r.get('researcher',{}).get('sources',{}))
+            candidate['manual_extraction']=proposals
+            for field in ('well_input_ul','dilution_factor','assay_duration'):
+                if field not in proposals or candidate.get('reviewer_edits',{}).get(field):continue
+                if field=='assay_duration' or candidate.get(field) in (None,''):
+                    candidate[field]=proposals[field]['value']
+            for field in ('well_input_ul','dilution_factor'):
+                proposal=proposals.get(field)
+                if proposal and candidate.get(field)==proposal['value'] and not candidate.get('cell_evidence',{}).get(field,{}).get('source_id'):
+                    candidate.setdefault('auto_evidence',{})[field]={**proposal,'value_at_review':candidate[field],'mapping_version':'manual-procedure-v1'}
         selected=platform.get('selected_kit'); kit=next((Candidate.model_validate(c) for c in candidates if c['id']==selected),None)
         if kit and case.parallel_start_from_kit and kit.dilution_factor is None:
             case.parallel_start_from_kit=False;s['case']=case.model_dump()
@@ -229,6 +243,9 @@ class Engine:
                 packet['cost']['incomplete']=True;packet['cost']['unresolved'].append('Retained cost overrides require confirmation for the changed scope.')
         packet['research_scope']=copy.deepcopy(r.get('researcher',{}).get('research_scope',{'deep_kit_limit':None,'exhaustive':False,'method':'Historical research scope retained; no new four-kit search performed.'}))
         from .selection import refresh_recommendation
+        from .source_mapping import map_packet
+        links=map_packet(packet)
+        if links:self.store.event(s['run_id'],'kit_field_sources_linked','source mapping',{'method':'Retained sources only; interpretation unverified','links':links,'model_calls':0})
         platform.setdefault('original_agent_recommended_kit',platform.get('recommended_kit',selected))
         packet['original_agent_recommended_kit']=platform['original_agent_recommended_kit']
         refreshed=refresh_recommendation(packet,packet.get('recommended_kit'))
@@ -637,7 +654,7 @@ class Engine:
         self.store.bind_intake_version(rid,update['current_version'],actor,{'from_version':update['saved_version'],'to_version':update['current_version'],'changed_fields':list(update['changes']),'scope_review_fields':update['review_fields'],'scope_confirmed':scope_confirmed,'scope_reason':scope_reason,'new_model_calls':len(self.store.usage(rid))-before,'intake':update['current_intake']})
         return True
 
-    def configure_review(self,rid,actor,kit_id=None,kit_price=None,matrix_price=None,start=None,factor=None,metadata=None,study_settings=None,cost_settings=None,experiment_settings=None,candidate_updates=None,report_details=None,evidence_update=None,use_kit_minimum=None,manual_update=None,estimate_origin='review_input',supporting_update=None,intake_update=None):
+    def configure_review(self,rid,actor,kit_id=None,kit_price=None,matrix_price=None,start=None,factor=None,metadata=None,study_settings=None,cost_settings=None,experiment_settings=None,candidate_updates=None,report_details=None,evidence_update=None,use_kit_minimum=None,manual_update=None,estimate_origin='review_input',supporting_update=None,intake_update=None,public_source_update=None):
         """Version a scientist's planning changes without new model calls or altering saved intake."""
         self.store.ensure_active(rid)
         s=self.store.run(rid)['data'];case=Intake.model_validate(s['case'])
@@ -664,6 +681,15 @@ class Engine:
                 src=supporting_update['source']
                 s['results'].setdefault('researcher',{}).setdefault('sources',{})[src['id']]=src
                 self.store.event(rid,'source_read',actor,src)
+
+        if public_source_update:
+            src=public_source_update['source'];quote=public_source_update['quote']
+            if src.get('content_hash')!=digest(src.get('text','')) or quote not in src.get('text','') or not src.get('url','').startswith('https://'):
+                raise ValueError('Public price requires a retained HTTPS source and exact price passage.')
+            target=public_source_update['candidate_id']
+            if target not in (candidate_updates or {}) or 'kit_price' not in candidate_updates[target]:raise ValueError('Public source must accompany its candidate price update.')
+            s['results'].setdefault('researcher',{}).setdefault('sources',{})[src['id']]=src
+            self.store.event(rid,'source_read','public vendor page',src)
 
         target_id=kit_id or s['packet'].get('selected_kit')
         chosen=next((c for c in s['packet']['candidates'] if c['id']==target_id),{})
@@ -709,6 +735,9 @@ class Engine:
                     candidate[key]=value
                     if key=='manual_url':candidate['retained_manual']={}
                 if 'kit_price' in updates:candidate['price_source']='reviewer:'+actor
+                if public_source_update and candidate['id']==public_source_update['candidate_id']:
+                    candidate['price_source']=public_source_update['source']['id']
+                    candidate.setdefault('auto_evidence',{})['kit_price']={'source_id':candidate['price_source'],'quote':public_source_update['quote'],'locator':public_source_update['locator'],'value_at_review':candidate['kit_price'],'method':'Observed public product price; not a vendor quote or guaranteed price'}
                 Candidate.model_validate(candidate)
         kit=next(c for c in candidates if c['id']==selected)
         if manual_update:

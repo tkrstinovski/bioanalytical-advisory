@@ -15,8 +15,10 @@ def core_fact_assessment(packet,kit):
         detail=cell_evidence_detail(packet,kit,field)
         missing=detail['value'] is None or detail['value']==''
         counted=bool(not missing and detail['inspectable'] and not detail['needs_recheck'])
-        status=('Value not recorded' if missing else 'Needs recheck after value change' if detail['needs_recheck'] else 'Scientist-verified passage' if counted and kit.get('cell_evidence',{}).get(field,{}).get('verified_by') else 'Source passage linked; interpretation not verified' if counted else 'No current linked source passage')
-        rows.append({'Core fact':label,'Current value':detail['value'],'Evidence status':status,'Included in supported count':counted,'Source ID':detail['source_id'],'Location':detail['locator']})
+        status=('Value not recorded' if missing else 'Needs recheck after value change' if detail['needs_recheck'] else 'Scientist-verified passage' if counted and detail['scientist_verified'] else 'Source passage linked' if counted else 'No current linked source passage')
+        from .names import species_parts
+        displayed=species_parts(detail['value'])[0] if field=='species' else detail['value']
+        rows.append({'Core fact':label,'Current value':displayed,'Evidence status':status,'Included in supported count':counted,'Source ID':detail['source_id'],'Location':detail['locator']})
     return rows
 
 def core_fact_summary(packet,kit,brief=False):
@@ -31,21 +33,24 @@ def core_fact_summary(packet,kit,brief=False):
 
 def cell_evidence_detail(packet,kit,field):
     current=kit.get(field);record=kit.get('cell_evidence',{}).get(field,{})
-    gate=FIELD_GATES.get(field);evidence=record if record else kit.get('evidence',{}).get(gate,{})
+    automatic=kit.get('auto_evidence',{}).get(field,{})
+    record_source=bool(record.get('source_id'))
+    gate=FIELD_GATES.get(field);evidence=(record if record_source else automatic) or record or kit.get('evidence',{}).get(gate,{})
     if not evidence and gate:
         evidence=next((kit.get('evidence',{}).get(key) for key in ALIASES[gate] if kit.get('evidence',{}).get(key)),{})
     source=packet.get('sources',{}).get(evidence.get('source_id'),{}) if evidence else {}
-    changed=bool(record and record.get('value_at_review')!=current) or bool(not record and kit.get('reviewer_edits',{}).get(field))
+    changed=bool(record_source and record.get('value_at_review')!=current) or bool(not record_source and automatic and automatic.get('value_at_review')!=current) or bool(not automatic and not record_source and record and record.get('value_at_review')!=current) or bool(not record and not automatic and kit.get('reviewer_edits',{}).get(field))
     inspectable=bool(source and evidence.get('quote') and evidence['quote'] in source.get('text','') and source.get('content_hash')==digest(source.get('text','')) and evidence.get('locator'))
     basis='Reviewer assertion / estimate'
     if inspectable:basis='Source passage linked; scientist interpretation required'
-    if record and record.get('verified_by') and inspectable:basis='Scientist-verified supporting passage'
+    scientist_verified=bool(record_source and record.get('verified_by') and inspectable and not changed)
+    if scientist_verified:basis='Scientist-verified supporting passage'
     if changed:basis='Value changed since evidence review; source interpretation needs recheck'
     return {'field':field,'value':current,'basis':basis,'source_id':evidence.get('source_id','') if evidence else '',
         'url':source.get('url') or record.get('reference_url') or kit.get('manual_url') or kit.get('vendor_url',''),'locator':evidence.get('locator','') if evidence else '',
         'quote':evidence.get('quote','') if evidence else '', 'reviewer':record.get('verified_by') or kit.get('reviewer_edits',{}).get(field,{}).get('actor',''),
         'reviewed_at':record.get('reviewed_at') or kit.get('reviewer_edits',{}).get(field,{}).get('timestamp',''),
-        'notes':record.get('notes',''),'needs_recheck':changed,'inspectable':inspectable}
+        'notes':record.get('notes',''),'needs_recheck':changed,'inspectable':inspectable,'scientist_verified':scientist_verified}
 
 
 def verified_cell_record(packet,kit,field,entry,actor,timestamp):

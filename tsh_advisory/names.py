@@ -8,7 +8,7 @@ def clean(value):
 
 def species_parts(value):
     """Separate a species label from appended vendor commentary, retaining both."""
-    parts=re.split(r';\s*(?=(?:vendor|manufacturer|calibrat\w*|standard\w*|reference material)\b)',str(value or ''),maxsplit=1,flags=re.I)
+    parts=re.split(r';\s*(?=(?:vendor|manufacturer|calibrat\w*|standard\w*|reference material|individual|specific NHP)\b)',str(value or ''),maxsplit=1,flags=re.I)
     return parts[0].strip(),parts[1].strip() if len(parts)>1 else ''
 
 def canonical(value,kind):

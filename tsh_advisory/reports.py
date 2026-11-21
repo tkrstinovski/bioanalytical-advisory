@@ -114,9 +114,11 @@ def readable_blocks(store,rid):
     selected=next((k for k in p.get('candidates',[]) if k['id']==p.get('selected_kit')),None)
     heading('Recommendation and kit selection')
     if selected:
+        from .policy import kit_selection_review_status
+        paragraph('Kit-selection review: '+kit_selection_review_status(store,rid,selected['id']))
         paragraph(f"Selected for review: {selected['manufacturer']} — {selected['name']} — catalog {selected['catalog']}, platform {selected['platform']}.")
         paragraph('Lead time: '+public_lead_time(p,selected))
-        paragraph('Six selection factors and trade-offs for the scientist-selected kit:')
+        paragraph('Six selection factors and trade-offs — '+selected['manufacturer']+' / '+selected['name']+' / catalog '+selected['catalog']+':')
         from .selection import selection_factors
         from .evidence_details import core_fact_assessment,cell_evidence_detail,CORE_FACTS
         core=core_fact_assessment(p,selected)
@@ -128,6 +130,7 @@ def readable_blocks(store,rid):
         status='provisional; comparison has ties or missing information' if p.get('recommendation_refresh',{}).get('status')!='clear_rule_based_choice' else 'supported by the recorded comparison; scientist confirmation required'
         paragraph('Current planning recommendation: '+(recommendation['name']+' / '+recommendation['catalog']+' ('+status+')' if recommendation else 'Pending; no clear supported choice')+'. Scientist selection and approval remain separate.')
         heading('Core kit facts and evidence coverage')
+        paragraph(selected['manufacturer']+' / '+selected['name']+' / catalog '+selected['catalog'])
         core_rows=[]
         for fact,(field,label) in zip(core,CORE_FACTS):
             detail=cell_evidence_detail(p,selected,field);value=fact['Current value']

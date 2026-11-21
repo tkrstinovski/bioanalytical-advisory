@@ -113,6 +113,16 @@ def scientific_complete(store,rid):
     decisions=current_decisions(store,rid,h)
     return all(decisions.get(('scientific',s),{}).get('action')=='approve' for s in SECTIONS)
 
+def kit_selection_review_status(store,rid,kit_id=None):
+    run=store.run(rid);packet=run['data'].get('packet',{})
+    selected=packet.get('selected_kit')
+    if kit_id and kit_id!=selected:return 'Not selected for scientific approval'
+    if store.case(run['case_id'])['version']!=run['case_version']:return 'Pending scientific approval — intake changed'
+    decision=current_decisions(store,rid,packet_hash(packet)).get(('scientific','recommendation'),{})
+    if decision.get('selected_kit')==selected and decision.get('action')=='approve':
+        return 'Simulated scientific approval — test data' if decision.get('simulation') else 'Scientifically approved'
+    return {'return':'Returned for revision','reject':'Rejected — revision required'}.get(decision.get('action'),'Pending scientific approval')
+
 def record_decision(store,rid,role,actor,section,action,reason,comments='',selected_kit=None,expected_hash=None,simulation=False,instrument_confirmed=False):
     store.ensure_active(rid)
     if not store.verify(rid): raise ValueError('Audit chain invalid; release stopped.')

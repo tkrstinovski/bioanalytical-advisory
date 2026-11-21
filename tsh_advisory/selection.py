@@ -25,7 +25,10 @@ def selection_analysis(packet,kit):
         else:reasons.append(f"Sample input is tied at {value:g} µL/well with {reference['catalog']}; it does not distinguish the choice.")
     else:reasons.append(f"Recorded sample input: {value:g} µL/well; comparable input is not established for other candidates." if value is not None else 'Sample-input comparison is unresolved.')
     matching=[f for f in ('species','analyte','matrix') if matches(packet.get('case',{}).get(f,''),kit.get(f,''),f)]
-    reasons.append('Eligibility facts: '+', '.join(matching)+' match the intake. These establish recorded fit, not superiority over other eligible kits.' if matching else 'Recorded eligibility facts require scientist review.')
+    from .evidence_details import core_fact_assessment
+    linked_fields={row['Core fact'].casefold() for row in core_fact_assessment(packet,kit) if row['Included in supported count']}
+    source_status='Source passages are linked for these matching fields.' if matching and all(('sample matrix' if field=='matrix' else field) in linked_fields for field in matching) else 'Source passages are not linked for every matching field.'
+    reasons.append('Recorded '+', '.join(matching)+' values match the intake. '+source_status if matching else 'Recorded fit requires scientist review; source linkage is assessed separately.')
     price=kit.get('kit_price');priced=[k for k in others if k.get('kit_price') is not None]
     if price is not None and priced:
         ref=min(priced,key=lambda k:k['kit_price'])
@@ -110,7 +113,8 @@ def selection_factors(packet,kit,brief=False):
     volume=f"{m['matrix_ul']:g} µL matrix per study sample including repeats/reserves; volume status: {m['study_status']}." if m['matrix_ul'] is not None else 'Practical sample-volume calculation unresolved.'
     cost=f"Estimated validation project cost: ${m['project_cost']:,.2f}; same intake scope and current cost assumptions." if m['project_cost'] is not None else 'Complete same-scope cost comparison unavailable; no lowest-cost claim.'
     if brief:
-        return [{'Selection factor':'Scientific fit','Current assessment':{'supported':'Species, analyte and matrix match the intake.','mismatch':'Recorded scientific mismatch; review required.','unknown':'Scientific support incomplete.'}[m['fit']]},
+        brief_fit='Recorded fit matches intake; source verification is separate.' if m['fit']=='supported' else 'Recorded mismatch; review required.' if m['fit']=='mismatch' else 'Recorded fit incomplete; sources assessed separately.'
+        return [{'Selection factor':'Scientific fit','Current assessment':brief_fit},
                 {'Selection factor':'Practical sample volume','Current assessment':f"{m['matrix_ul']:g} µL/sample including repeat/reserves; {m['study_status']}." if m['matrix_ul'] is not None else 'Not yet calculated.'},
                 {'Selection factor':'Workflow and equipment','Current assessment':(kit.get('assay_duration') or 'Assay duration not documented')[:100]+'; scientist confirms equipment.'},
                 {'Selection factor':'Evidence support','Current assessment':core_fact_summary(packet,kit,brief=True)},

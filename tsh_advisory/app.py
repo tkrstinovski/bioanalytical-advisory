@@ -14,6 +14,7 @@ _modules.append('cost_grid')
 _modules.append('supporting_documents')
 _modules.append('document_extraction')
 _modules.append('intake_updates')
+_modules.extend(['source_mapping','manual_facts'])
 _signature=tuple((Path(__file__).parent/(name+'.py')).stat().st_mtime_ns for name in _modules)
 _anonymous_demo=(Path(__file__).resolve().parents[1]/'.public-sandbox').is_file() or os.getenv('BIO_ADVISORY_PUBLIC_DEMO','').lower() in ('1','true','yes')
 if not _anonymous_demo and getattr(package,'_source_signature',None)!=_signature:
@@ -318,6 +319,11 @@ def volume_charts(p,rid):
         st.caption('The study volume limit does not apply to validation pooled lots. Scientist to confirm the proposed sample preparation and dilution plan.')
 
 def selection_review_tables(p,kit,rid):
+    identity=kit.get('manufacturer','')+' — '+kit.get('name','')+' — catalog '+kit.get('catalog','')
+    st.markdown('#### Selection factors')
+    st.caption(identity)
+    from tsh_advisory.policy import kit_selection_review_status
+    st.caption('Kit-selection review: '+kit_selection_review_status(store,rid,kit['id']))
     from tsh_advisory.selection import selection_factors
     from tsh_advisory.evidence_details import core_fact_assessment,cell_evidence_detail,CORE_FACTS
     facts=core_fact_assessment(p,kit);linked=sum(r['Included in supported count'] for r in facts)
@@ -326,6 +332,7 @@ def selection_review_tables(p,kit,rid):
         if row['Selection factor']=='Evidence support':row['Current assessment']=f'{linked}/6 core facts have current linked source passages; coverage is detailed below.'
     readable_table(factors)
     st.markdown('#### Core kit facts · source coverage')
+    st.caption(identity)
     shown=[]
     for row,(field,label) in zip(facts,CORE_FACTS):
         value=row['Current value']
@@ -992,7 +999,7 @@ def export_view(rid,p,state,run,cid):
     selected=next((display_kit(k) for k in p.get('candidates',[]) if k['id']==p.get('selected_kit')),None)
     manual_url=manual_reference(p,selected)[0] if selected else ''
     attach_manual=st.checkbox('Attach selected kit manual to PDF report and evidence bundle',value=bool(manual_url),disabled=not bool(manual_url),key='attach_manual_'+rid)
-    export_options=(packet_hash(p),attach_manual,'client-visual-parity-v19-species-labels')
+    export_options=(packet_hash(p),attach_manual,'client-visual-parity-v20-retained-source-facts')
     if st.session_state.get('export_options_'+rid)!=export_options:
         st.session_state.pop('pdf_'+rid,None);st.session_state.pop('export_'+rid,None)
         st.session_state['export_options_'+rid]=export_options

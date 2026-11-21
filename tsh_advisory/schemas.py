@@ -122,7 +122,9 @@ class Candidate(Strict):
     evidence: dict[str,Evidence] = Field(default_factory=dict)
     well_input_ul: float | None = Field(default=None, gt=0)
     dilution_factor: float | None = Field(default=None, ge=1)
-    handling_ul: float | None = Field(default=None, ge=0)
+    handling_ul: float | None = Field(default=20, ge=0)
+    auto_evidence: dict[str,dict] = Field(default_factory=dict)
+    manual_extraction: dict[str,dict] = Field(default_factory=dict)
     kit_price: float | None = Field(default=None, gt=0)
     price_source: str = ''
     wells_per_kit: int = Field(default=96, ge=1)
