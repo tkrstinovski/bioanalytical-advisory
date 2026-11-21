@@ -53,6 +53,8 @@ def candidate_metrics(packet,kit):
     from .design import enforce_design
     known_fit=all(packet.get('case',{}).get(f) and kit.get(f) for f in ('species','analyte','matrix'))
     fit=('supported' if all(matches(packet['case'][f],kit[f],f) for f in ('species','analyte','matrix')) else 'mismatch') if known_fit else 'unknown'
+    from .names import strain_check
+    if strain_check(packet.get('case',{}),kit)['mismatch']:fit='mismatch'
     fields=('analyte','species','matrix','well_input_ul','dilution_factor','curve_range')
     from .evidence_details import core_fact_assessment
     evidence=sum(row['Included in supported count'] for row in core_fact_assessment(packet,kit))

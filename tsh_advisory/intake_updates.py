@@ -4,7 +4,7 @@ from .schemas import Intake,Plan,Experiment
 from .design import experiment_design,enforce_design
 from .names import matches
 
-SCOPE_FIELDS={'analyte','species','matrix','intended_use','regulatory_use','instruments'}
+SCOPE_FIELDS={'analyte','species','species_strain','matrix','intended_use','regulatory_use','instruments'}
 
 def preview(store,rid):
     run=store.run(rid);state=run['data'];saved=store.case(run['case_id'])
@@ -17,6 +17,7 @@ def preview(store,rid):
     review=[]
     for field in changes.keys() & SCOPE_FIELDS:
         old,new=baseline[field],current[field]
+        if field=='species_strain' and not str(new).strip():continue
         equivalent=matches(old,new,field) if field in ('analyte','species','matrix') else str(old).strip().casefold()==str(new).strip().casefold()
         if not equivalent:review.append(field)
     return {'saved_version':run['case_version'],'current_version':saved['version'],'version_changed':saved['version']!=run['case_version'],'changes':changes,'review_fields':sorted(review),'current_intake':current}

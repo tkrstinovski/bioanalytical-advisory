@@ -70,6 +70,9 @@ def quality(case: Intake,packet):
         kit=Candidate.model_validate({k:v for k,v in c.items() if k in Candidate.model_fields}); reasons=[]
         for field,expected in [('analyte',case.analyte),('species',case.species),('matrix',case.matrix)]:
             if not matches(expected,getattr(kit,field),field):reasons.append(f'{field} mismatch')
+        from .names import strain_check
+        strain=strain_check(case.model_dump(),kit.model_dump())
+        if strain['mismatch']:reasons.append('strain mismatch: '+strain['requested']+' versus documented '+strain['reported'])
         for gate in ['identity','matrix','range','volume']:
             # Source-backed equivalent names are resolved by canonical matching,
             # rather than a model's exact-string gate. Other evidence checks remain.

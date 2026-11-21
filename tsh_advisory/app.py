@@ -98,6 +98,7 @@ def intake_view(cid):
     with a:
         d['analyte']=st.text_input('Analyte',d['analyte'],key=sandbox_widget_key('line96','Analyte'))
         d['species']=st.text_input('Species',d['species'],key=sandbox_widget_key('line97','Species'))
+        d['species_strain']=st.text_input('Species strain (optional)',d.get('species_strain',''),key=sandbox_widget_key('species_strain','Species strain (optional)'),help='Blank means no strain restriction. Flag only an explicitly documented strain conflict.')
         d['matrix']=st.text_input('Matrix',d['matrix'],key=sandbox_widget_key('line98','Matrix'))
     with b:
         uses=['Detect treatment-related changes versus controls','Preclinical safety assessment','Pharmacodynamic response','Dose-response assessment','Exploratory biomarker assessment','Disease progression monitoring','Method development and validation planning']
@@ -816,6 +817,13 @@ def run_view(cid):
         if st.button('Stop this run'):store.stop(rid,'local project owner');st.rerun()
     if run['stopped']:
         errors=[e['data']['data'] for e in store.events(rid) if e['data']['event']=='run_error']
+        if errors and errors[-1].get('message')=='UNIQUE constraint failed: operations.key':
+            st.warning('A task-cache key collision stopped this run. Resume using its retained agent response; the failed step is not sent to the model again. Remaining agents may incur normal API charges within the existing limits.')
+            if st.button('Resume saved run after database key repair'):
+                try:
+                    with st.spinner('Reusing saved agent response and continuing unfinished tasks…'):engine_action(lambda e:e.resume_operation_collision(rid))
+                    st.rerun()
+                except Exception as exc:st.error(str(exc))
         if errors and errors[-1].get('message','').startswith('Planner omitted requested parameters:'):
             st.warning('The planner omitted requested experiments. Resume the saved planner step with design correction; completed research and finalist selection are retained. Existing API spending and call limits still apply.')
             if st.button('Resume failed planner using saved finalists'):
@@ -984,7 +992,7 @@ def export_view(rid,p,state,run,cid):
     selected=next((display_kit(k) for k in p.get('candidates',[]) if k['id']==p.get('selected_kit')),None)
     manual_url=manual_reference(p,selected)[0] if selected else ''
     attach_manual=st.checkbox('Attach selected kit manual to PDF report and evidence bundle',value=bool(manual_url),disabled=not bool(manual_url),key='attach_manual_'+rid)
-    export_options=(packet_hash(p),attach_manual,'client-visual-parity-v16')
+    export_options=(packet_hash(p),attach_manual,'client-visual-parity-v17-species-and-kit-specific-sources')
     if st.session_state.get('export_options_'+rid)!=export_options:
         st.session_state.pop('pdf_'+rid,None);st.session_state.pop('export_'+rid,None)
         st.session_state['export_options_'+rid]=export_options

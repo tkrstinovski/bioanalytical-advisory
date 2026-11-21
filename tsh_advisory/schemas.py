@@ -15,6 +15,7 @@ class Intake(Strict):
     title: str = Field(min_length=1)
     analyte: str = ''
     species: str = ''
+    species_strain: str = ''
     matrix: str = ''
     intended_use: str = ''
     instruments: dict[str, str] = Field(default_factory=dict)
@@ -110,9 +111,12 @@ class Candidate(Strict):
     platform: str
     analyte: str
     species: str
+    species_strain: str = ''
     matrix: str
     documentation_version: str = 'unresolved'
     required_model: str = ''
+    wavelength: str = ''
+    detection_mode: str = ''
     vendor_instruments: list[str] = Field(default_factory=list)
     gates: dict[str,Literal['pass','fail','unresolved']] = Field(default_factory=dict)
     evidence: dict[str,Evidence] = Field(default_factory=dict)

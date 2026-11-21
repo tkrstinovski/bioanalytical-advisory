@@ -102,8 +102,8 @@ class Engine:
     def worker(self,s):
         rid=s['run_id']; self.store.ensure_active(rid)
         task=s['queue'][0]; role=task['role']; results=dict(s.get('results',{})); case=Intake.model_validate(s['case'])
-        key=digest([rid,s.get('iteration',0),role,task['objective']])
-        with self.store.connect() as c: old=c.execute('SELECT data FROM operations WHERE key=?',(key,)).fetchone()
+        operation_key=digest([rid,s.get('iteration',0),role,task['objective']])
+        with self.store.connect() as c: old=c.execute('SELECT data FROM operations WHERE key=?',(operation_key,)).fetchone()
         if old: output=json.loads(old[0])
         elif s['mode']=='fixture':
             if s.get('settings',{}).get('manual_demo'):
@@ -119,6 +119,7 @@ class Engine:
             context['structured_findings']='Assign issue_code to each finding: MISSING_MATRIX_PRICE, MISSING_KIT_PRICE, MISSING_SAMPLE_INPUT, STUDY_VOLUME, PLATE_CAPACITY, INTAKE_PARAMETER_OMITTED, UNSUPPORTED_CLAIM or REVIEWER_DIRECTION. Set scope_class=planning for current intake/calculation concerns; execution_detail or out_of_scope for optional future laboratory work. Split mixed findings. Known issue codes are rechecked against current saved values; unknown issues stay for human review. Do not resolve a concern based on prose alone.'
             context['selection_rubric']='Explain comparative trade-offs, not five generic advantages. Species/analyte/matrix are eligibility facts; compare sample consumption, pipettable preparation, kit-manual workflow/equipment, evidence strength, same-scope cost and lead time. Missing competitor facts do not establish superiority. No fabricated scores.'
             context['name_matching']='Use canonical species/analyte/matrix aliases and normalized manufacturer/platform names. Mus musculus = mouse; Rattus norvegicus = rat; thyroid stimulating hormone = TSH; Bio-Plex = BioPlex. Formatting differences are not incompatibilities. Do not equate different instrument models or infer performance from name similarity. Cite actual manual support.'
+            context['optional_strain_and_reader_policy']='NHP, Monkey and non-human primate are equivalent broad naming labels. Cyno/cynomolgus/Macaca fascicularis are aliases; rhesus/Macaca mulatta are aliases. Do not conflate explicit cynomolgus and rhesus species. Store any kit strain restriction separately as species_strain. Intake species_strain is OPTIONAL: blank means no strain restriction and must never produce missing-strain, species-mismatch or strain-mismatch findings. Only flag a documented explicit strain conflict when intake strain is provided and kit strain differs; undocumented kit strain is not a mismatch. Microplate reader, microtitre plate reader and microtiter plate reader are SpectraMax family naming equivalents, not exact model specifications. Extract wavelength and detection_mode into candidate fields from manual/vendor when available. These two fields are informational for scientist review: neither absent values nor differing wavelength/detection mode produce mismatch findings, eligibility penalties or approval blockers. Preserve the documented values without claiming verified equipment capability.'
             context['planning_boundaries']='Intake instruments are the available instruments. List vendor/manual instrument requirements separately; scientist confirms the equipment arrangement at approval. Instrument compatibility, configuration and readiness are advisory, not automatic gates. Assay calibration standards and QCs remain part of the plan. Expected study concentrations are unknown by design and are NOT an approval requirement: use category expected_concentration_unknown for that planning note. Always report and cite the manufacturer curve range. Do not fail the range gate solely because study concentrations are unknown. A documented known range problem uses category range_coverage_mismatch and remains a planning finding. Split mixed findings into separate issues.'
             context['instrument_policy']='Report vendor_instruments only from the kit manual/vendor; never copy intake instruments into that field or infer brand/model support from a platform name. Intake instruments are a separate availability list. Do not require agents to match instruments, models or platforms; do not fail instrument gates or planning approval because of missing/mismatched instrument information. Instrument compatibility, essential configuration and readiness are advisory notes under the instrument finding categories. The named scientist confirms the arrangement at recommendation approval. Continue reporting documented requirements and concerns without asserting a match. This instrument policy supersedes any earlier instrument matching requirement.'
             context['finding_scope_rules']='For every finding specify scope project, selected_kit or alternative_only; include exact candidate_ids for kit-specific issues. An unrelated alternative-only gap does not block the selected kit. Set affects_selection_rationale=true when an incorrect comparison, invalid exclusion or missing alternative evidence undermines the recommendation itself; those remain project-wide advisory findings. Uncertain attribution stays project scope. Do not mark a gap resolved just because a different kit was selected.'
@@ -174,7 +175,7 @@ class Engine:
                 previous={c['id']:c for c in s.get('packet',{}).get('candidates',[])}
                 for c in output.get('candidates',[]):
                     c['retained_manual']=copy.deepcopy(previous.get(c['id'],{}).get('retained_manual',{})) if previous.get(c['id'],{}).get('manual_url')==c.get('manual_url') else {}
-                    for key in ('reviewer_edits','cell_evidence'):c[key]=copy.deepcopy(previous.get(c['id'],{}).get(key,{}))
+                    for field_name in ('reviewer_edits','cell_evidence'):c[field_name]=copy.deepcopy(previous.get(c['id'],{}).get(field_name,{}))
             if role in ('platform','researcher'): output['candidates']=[Candidate.model_validate(c).model_dump() for c in output.get('candidates',[])]
         if s.get('continuation') and role=='platform':
             ids=s['continuation']['finalist_ids'];working=s['continuation']['working_kit']
@@ -185,7 +186,7 @@ class Engine:
             output['selected_kit']=working
         if role=='platform' and 'recommended_kit' not in output:output['recommended_kit']=output.get('selected_kit')
         if not old:
-            with self.store.connect() as c: c.execute('INSERT INTO operations VALUES(?,?)',(key,json.dumps(output)))
+            with self.store.connect() as c: c.execute('INSERT INTO operations VALUES(?,?)',(operation_key,json.dumps(output)))
             self.store.event(rid,'agent_output',role,{'task':task,'iteration':s.get('iteration',0),'output':output})
         self.store.task(rid,role,task['objective'],'completed',{'iteration':s.get('iteration',0),'output_hash':digest(output)})
         results[role]=output
@@ -311,6 +312,51 @@ class Engine:
     def resume(self,rid,feedback):
         self.store.ensure_active(rid)
         return self.run_graph(rid,Command(resume=feedback))
+    def repair_operation_collision(self,rid):
+        """Recover an accepted handoff from its retained response, without a model call."""
+        run=self.store.run(rid)
+        events=self.store.events(rid)
+        errors=[e for e in events if e['data']['event']=='run_error']
+        if not run['stopped'] or not errors or errors[-1]['data']['data'].get('message')!='UNIQUE constraint failed: operations.key':
+            raise ValueError('This recovery requires the saved operation-key collision.')
+        if not self.store.verify(rid):raise ValueError('Audit chain invalid; intervention required.')
+        if self.store.case(run['case_id'])['version']!=run['case_version']:raise ValueError('Intake changed. Retained response must be reviewed against the saved intake first.')
+        checkpoint=self.graph.get_state({'configurable':{'thread_id':rid}})
+        state=checkpoint.values
+        queue=state.get('queue',[])
+        if not queue or queue[0]['role'] not in ('researcher','platform'):raise ValueError('Checkpoint does not match the affected research/platform step.')
+        task=queue[0];role=task['role']
+        responses=[e for e in events if e['seq']<errors[-1]['seq'] and e['data']['event']=='model_response' and e['data']['actor']==role]
+        if not responses:raise ValueError('No retained model response is available; no retry was sent.')
+        response=responses[-1];payload=response['data']['data']
+        if payload.get('response_status','completed')!='completed':raise ValueError('Retained response was incomplete; no retry was sent.')
+        handoff=json.loads(payload['text'])
+        if handoff.get('action')!='finish' or not isinstance(handoff.get('result'),dict):raise ValueError('Retained response is not a completed handoff.')
+        output=copy.deepcopy(handoff['result'])
+        output['candidates']=[Candidate.model_validate(c).model_dump() for c in output.get('candidates',[])]
+        if not output['candidates']:raise ValueError('Retained handoff has no validated candidates.')
+        if role=='platform':
+            if output.get('selected_kit') not in {c['id'] for c in output['candidates']}:raise ValueError('Retained kit selection does not match its candidates.')
+            output.setdefault('recommended_kit',output['selected_kit'])
+        else:
+            sources=dict(state.get('results',{}).get('researcher',{}).get('sources',{}))
+            for event in events:
+                if event['data']['event']=='source_read':
+                    source=event['data']['data'];sources[source['id']]=source
+            output['sources']=sources
+        operation_key=digest([rid,state.get('iteration',0),role,task['objective']])
+        with self.store.connect() as c:
+            c.execute('INSERT OR IGNORE INTO operations VALUES(?,?)',(operation_key,json.dumps(output)))
+            self.store._event(c,rid,'operation_collision_repaired','system',{'role':role,'operation_key':operation_key,'retained_response_seq':response['seq'],'model_calls':0,'legacy_records':'preserved'})
+        return operation_key
+
+    def resume_operation_collision(self,rid):
+        self.repair_operation_collision(rid)
+        with self.store.connect() as c:
+            c.execute('UPDATE runs SET stopped=0 WHERE id=?',(rid,))
+            self.store._event(c,rid,'operation_collision_resumed','local project owner',{'policy':'Reuse recovered handoff; subsequent unfinished agents retain existing call/spend limits.'})
+        return self.run_graph(rid,None)
+
     def retry_research_step(self,rid):
         run=self.store.run(rid)
         errors=[e['data']['data'] for e in self.store.events(rid) if e['data']['event']=='run_error']
@@ -649,7 +695,7 @@ class Engine:
         candidates=[{k:v for k,v in c.items() if k in Candidate.model_fields} for c in s['packet']['candidates']]
         if selected not in [c['id'] for c in candidates]:raise ValueError('Select a kit to calculate its volumes.')
         if candidate_updates:
-            allowed={'kit_price','vendor_url','manual_url','manual_checked_at','assay_duration','curve_range','required_equipment','reviewer_lead_time','reviewer_notes','well_input_ul','dilution_factor','vendor_instruments','handling_ul','analyte','species','matrix'}
+            allowed={'kit_price','vendor_url','manual_url','manual_checked_at','assay_duration','curve_range','required_equipment','reviewer_lead_time','reviewer_notes','well_input_ul','dilution_factor','vendor_instruments','handling_ul','analyte','species','species_strain','wavelength','detection_mode','matrix'}
             for candidate in candidates:
                 updates=candidate_updates.get(candidate['id'],{})
                 for key,value in updates.items():

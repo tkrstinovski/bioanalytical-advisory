@@ -7,6 +7,13 @@ SCOPE_POLICY='advisory-findings-v8-structured-resolution-checks'
 def obsolete_scope_reason(f,packet):
     """Archive execution demands, preserving actual kit/design conflicts as current flags."""
     if f.get('origin')!='agent':return ''
+    text=f.get('message','').casefold()
+    independent_concern=any(term in text for term in ('missing sample input','missing kit price','matrix mismatch','insufficient plate capacity','source hash mismatch','incorrect volume','missing dilution','kit manual conflicts'))
+    if not independent_concern and any(topic in text for topic in ('wavelength','detection mode','detection-mode')):
+        return 'Informational kit specification for scientist review: wavelength and detection mode are listed in comparison/report, not mismatch findings or approval requirements.'
+    if not independent_concern and not str(packet.get('case',{}).get('species_strain') or '').strip() and any(topic in text for topic in ('strain','subspecies')):
+        if any(term in text for term in ('missing','unspecified','not specified','not provided','unknown','strain mismatch','subspecies mismatch')):
+            return 'No strain restriction was entered. Optional strain is not a missing requirement or species mismatch.'
     if f.get('issue_code'):
         from .issue_checks import resolution_for
         return resolution_for(f,packet) or ''

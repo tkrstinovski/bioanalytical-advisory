@@ -4,7 +4,7 @@ import math
 import json
 from .comparison import comparison_rows,manual_reference
 
-FIELDS={'Analyte':'analyte','Species':'species','Matrix':'matrix','Kit curve range':'curve_range',
+FIELDS={'Analyte':'analyte','Species':'species','Species strain (kit documentation)':'species_strain','Wavelength (manual/vendor)':'wavelength','Detection mode (manual/vendor)':'detection_mode','Matrix':'matrix','Kit curve range':'curve_range',
         'Assay input (µL/well)':'well_input_ul','Manual dilution factor':'dilution_factor',
         'Study handling allowance (µL)':'handling_ul','Kit price (USD)':'kit_price',
         'Lead time':'reviewer_lead_time','Assay duration (manual)':'assay_duration',
